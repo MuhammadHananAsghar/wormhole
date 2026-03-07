@@ -16,10 +16,6 @@ new_sqlite_classes = ["Tunnel"]
 pattern = "*.wormhole.bar/*"
 zone_id = "9c072e7ba0809f3a6ec55b6fdaa53ad1"
 
-[[routes]]
-pattern = "wormhole.bar/*"
-zone_id = "9c072e7ba0809f3a6ec55b6fdaa53ad1"
-
 [[d1_databases]]
 binding = "DB"
 database_name = "wormhole-db"
