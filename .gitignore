@@ -1,0 +1,38 @@
+# Binaries
+wormhole
+wormhole.exe
+dist/
+
+# Go
+*.test
+*.out
+coverage.txt
+
+# Node
+node_modules/
+.wrangler/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code
+.agents/
+.claude/
+skills-lock.json
+phases/
+Wormhole_Project_Plan.md
+
+# Environment
+.env
+.env.local
+
+# Config (user-specific)
+config.json
