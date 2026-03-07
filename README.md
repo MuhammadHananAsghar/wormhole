@@ -59,7 +59,7 @@ wormhole http 3000
 ### Quick install (macOS / Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/MuhammadHananAsghar/wormhole/main/install.sh | sh
+curl -fsSL https://wormhole.bar/install.sh | sh
 ```
 
 ### Homebrew (macOS)
@@ -134,6 +134,8 @@ wormhole http <port> --no-inspect       # Disable inspector
 wormhole login                          # Authenticate via GitHub
 wormhole logout                         # Remove stored credentials
 wormhole status                         # Show auth status
+wormhole uninstall                      # Remove wormhole from system
+wormhole uninstall --purge              # Also remove config (~/.wormhole/)
 wormhole version                        # Print version
 ```
 
