@@ -10,6 +10,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"syscall"
 	"time"
 
@@ -346,6 +347,18 @@ func versionCmd() *cobra.Command {
 	}
 }
 
+func isBrewInstall() bool {
+	binPath, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	resolved, err := filepath.EvalSymlinks(binPath)
+	if err != nil {
+		return false
+	}
+	return strings.Contains(resolved, "Cellar") || strings.Contains(resolved, "homebrew")
+}
+
 func uninstallCmd() *cobra.Command {
 	var purge bool
 
@@ -353,17 +366,23 @@ func uninstallCmd() *cobra.Command {
 		Use:   "uninstall",
 		Short: "Remove wormhole from your system",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			// Find the binary path
-			binPath, err := os.Executable()
-			if err != nil {
-				return fmt.Errorf("finding wormhole binary: %w", err)
-			}
-			binPath, err = filepath.EvalSymlinks(binPath)
-			if err != nil {
-				return fmt.Errorf("resolving binary path: %w", err)
+			brewInstall := isBrewInstall()
+
+			if brewInstall {
+				fmt.Println("Installed via: Homebrew")
+				fmt.Println("Formula:       MuhammadHananAsghar/tap/wormhole")
+			} else {
+				binPath, err := os.Executable()
+				if err != nil {
+					return fmt.Errorf("finding wormhole binary: %w", err)
+				}
+				binPath, err = filepath.EvalSymlinks(binPath)
+				if err != nil {
+					return fmt.Errorf("resolving binary path: %w", err)
+				}
+				fmt.Printf("Binary: %s\n", binPath)
 			}
 
-			fmt.Printf("Binary: %s\n", binPath)
 			if purge {
 				configDir, _ := config.ConfigDir()
 				if configDir != "" {
@@ -379,22 +398,37 @@ func uninstallCmd() *cobra.Command {
 				return nil
 			}
 
-			// Remove binary — may need sudo
-			if err := os.Remove(binPath); err != nil {
-				if os.IsPermission(err) {
-					fmt.Println("Permission denied. Trying with sudo...")
-					sudoCmd := exec.Command("sudo", "rm", binPath)
-					sudoCmd.Stdin = os.Stdin
-					sudoCmd.Stdout = os.Stdout
-					sudoCmd.Stderr = os.Stderr
-					if err := sudoCmd.Run(); err != nil {
-						return fmt.Errorf("removing binary with sudo: %w", err)
-					}
-				} else {
-					return fmt.Errorf("removing binary: %w", err)
+			if brewInstall {
+				// Use brew uninstall for Homebrew installations
+				fmt.Println("Running: brew uninstall wormhole")
+				brewCmd := exec.Command("brew", "uninstall", "wormhole")
+				brewCmd.Stdin = os.Stdin
+				brewCmd.Stdout = os.Stdout
+				brewCmd.Stderr = os.Stderr
+				if err := brewCmd.Run(); err != nil {
+					return fmt.Errorf("brew uninstall failed: %w", err)
 				}
+			} else {
+				// Manual removal for curl/go install
+				binPath, _ := os.Executable()
+				binPath, _ = filepath.EvalSymlinks(binPath)
+
+				if err := os.Remove(binPath); err != nil {
+					if os.IsPermission(err) {
+						fmt.Println("Permission denied. Trying with sudo...")
+						sudoCmd := exec.Command("sudo", "rm", binPath)
+						sudoCmd.Stdin = os.Stdin
+						sudoCmd.Stdout = os.Stdout
+						sudoCmd.Stderr = os.Stderr
+						if err := sudoCmd.Run(); err != nil {
+							return fmt.Errorf("removing binary with sudo: %w", err)
+						}
+					} else {
+						return fmt.Errorf("removing binary: %w", err)
+					}
+				}
+				fmt.Printf("Removed %s\n", binPath)
 			}
-			fmt.Printf("Removed %s\n", binPath)
 
 			// Remove config directory if --purge
 			if purge {
