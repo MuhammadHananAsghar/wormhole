@@ -1,0 +1,48 @@
+<svg width="1280" height="640" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a0a0a"/>
+      <stop offset="100%" style="stop-color:#111111"/>
+    </linearGradient>
+    <linearGradient id="logo" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#22c55e"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="40%" r="50%">
+      <stop offset="0%" style="stop-color:rgba(34,197,94,0.12)"/>
+      <stop offset="100%" style="stop-color:rgba(34,197,94,0)"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <rect width="1280" height="640" fill="url(#glow)"/>
+
+  <!-- Border accent line at top -->
+  <rect width="1280" height="3" fill="url(#logo)"/>
+
+  <!-- Logo text -->
+  <text x="640" y="220" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="82" font-weight="800" fill="url(#logo)" letter-spacing="-2">wormhole</text>
+
+  <!-- Green dot -->
+  <circle cx="818" cy="205" r="8" fill="#22c55e">
+    <animate attributeName="opacity" values="1;0.4;1" dur="2s" repeatCount="indefinite"/>
+  </circle>
+
+  <!-- Tagline -->
+  <text x="640" y="290" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="32" fill="#e5e5e5" font-weight="600">Expose your localhost to the internet</text>
+
+  <!-- Subtitle -->
+  <text x="640" y="340" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="20" fill="#888888">Open-source ngrok alternative. One command. No signup. Just works.</text>
+
+  <!-- Terminal snippet -->
+  <rect x="390" y="385" width="500" height="50" rx="8" fill="#161616" stroke="#333" stroke-width="1"/>
+  <text x="420" y="417" font-family="'SF Mono', 'Cascadia Code', Consolas, monospace" font-size="17" fill="#555">$</text>
+  <text x="440" y="417" font-family="'SF Mono', 'Cascadia Code', Consolas, monospace" font-size="17" fill="#e5e5e5">wormhole http 3000</text>
+
+  <!-- URL -->
+  <text x="640" y="490" text-anchor="middle" font-family="'SF Mono', 'Cascadia Code', Consolas, monospace" font-size="18" fill="#22c55e">wormhole.bar</text>
+
+  <!-- Bottom badges -->
+  <text x="640" y="560" text-anchor="middle" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="16" fill="#555">Go + Cloudflare Workers  |  MIT License  |  Free &amp; Open Source</text>
+</svg>
