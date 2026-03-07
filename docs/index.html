@@ -195,18 +195,34 @@
             pointer-events: none;
         }
 
-        .hero-ascii {
-            font-family: var(--font-mono);
-            font-size: clamp(0.55rem, 2vw, 0.85rem);
-            line-height: 1.3;
-            letter-spacing: 0.05em;
+        .hero-logo {
+            font-size: clamp(2rem, 6vw, 3.5rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
             background: linear-gradient(135deg, var(--logo-gradient-1), var(--logo-gradient-2));
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 1.5rem;
-            white-space: pre;
+            margin-bottom: 0.25rem;
             display: inline-block;
+            font-family: var(--font-sans);
+        }
+        .hero-logo-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 12px var(--accent);
+            margin-left: 0.25rem;
+            vertical-align: middle;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        .hero-version {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 1.5rem;
         }
 
         .hero h1 {
@@ -314,10 +330,10 @@
         .terminal-dot.green { background: #28c840; }
 
         .terminal-body {
-            padding: 1.25rem;
+            padding: 1.5rem;
             font-family: var(--font-mono);
             font-size: 0.8rem;
-            line-height: 1.6;
+            line-height: 1.5;
             color: #e5e5e5;
             overflow-x: auto;
         }
@@ -329,6 +345,37 @@
         .terminal-body .t-blue { color: #60a5fa; }
         .terminal-body .t-red { color: #f87171; }
         .terminal-body .t-purple { color: #a78bfa; }
+        .terminal-body .t-white { color: #e5e5e5; }
+
+        .term-prompt { color: #555; margin-bottom: 1rem; display: block; }
+        .term-cmd { color: #e5e5e5; }
+
+        .term-info-box {
+            border: 1px solid #333;
+            border-radius: 6px;
+            padding: 0.75rem 1rem;
+            margin: 1rem 0;
+            display: grid;
+            grid-template-columns: auto 1fr;
+            gap: 0.25rem 1rem;
+            align-items: center;
+        }
+        .term-info-box .label { color: #fbbf24; text-align: right; }
+        .term-info-box .value { color: #e5e5e5; }
+
+        .term-requests { margin-top: 1rem; }
+        .term-requests .term-header {
+            color: #555;
+            margin-bottom: 0.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #333;
+        }
+        .term-row {
+            display: grid;
+            grid-template-columns: 50px 1fr 36px 42px;
+            gap: 0.5rem;
+            padding: 0.2rem 0;
+        }
 
         /* ========== Sections ========== */
         section {
@@ -459,23 +506,58 @@
         }
 
         /* ========== Architecture ========== */
-        .arch-diagram {
-            font-family: var(--font-mono);
-            font-size: 0.75rem;
-            line-height: 1.5;
-            white-space: pre;
-            color: var(--text-secondary);
+        .arch-visual {
+            display: grid;
+            grid-template-columns: 1fr auto 1fr;
+            gap: 1rem;
+            align-items: center;
             background: var(--bg-code);
             border: 1px solid var(--border);
             border-radius: 12px;
             padding: 2rem;
-            overflow-x: auto;
             margin: 1.5rem 0;
+            overflow-x: auto;
         }
-        .arch-diagram .a-green { color: var(--accent); }
-        .arch-diagram .a-blue { color: var(--blue); }
-        .arch-diagram .a-purple { color: var(--purple); }
-        .arch-diagram .a-yellow { color: var(--yellow); }
+        .arch-box {
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+        }
+        .arch-box-title {
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 0.75rem;
+            font-weight: 600;
+        }
+        .arch-box-item {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            padding: 0.2rem 0;
+        }
+        .arch-connector {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.25rem;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.7rem;
+        }
+        .arch-arrow {
+            font-size: 1.5rem;
+            color: var(--accent);
+            letter-spacing: -2px;
+        }
+        @media (max-width: 640px) {
+            .arch-visual {
+                grid-template-columns: 1fr;
+                text-align: center;
+            }
+            .arch-arrow { transform: rotate(90deg); }
+        }
 
         /* ========== Comparison Table ========== */
         .comparison-table {
@@ -642,10 +724,8 @@
     <!-- Hero -->
     <div class="container">
         <section class="hero">
-            <div class="hero-ascii">
-  &#9608;   &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9604;&#9600;&#9608; &#9608;  &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;   &#9608;&#9600;&#9600;
-  &#9608;&#9604;&#9608;&#9604;&#9608; &#9608;  &#9608; &#9608;&#9604;&#9604;&#9600; &#9608; &#9608; &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;  &#9608; &#9608;   &#9608;&#9600;&#9600;
-  &#9600; &#9600; &#9600; &#9600;&#9600;&#9600;&#9600; &#9600; &#9600;&#9600; &#9600;   &#9600; &#9600;  &#9600; &#9600;&#9600;&#9600;&#9600; &#9600;&#9600;&#9600; &#9600;&#9600;&#9600;</div>
+            <div class="hero-logo">wormhole<span class="hero-logo-dot"></span></div>
+            <div class="hero-version">v0.1.0</div>
             <h1>Expose your localhost<br>to the internet. Instantly.</h1>
             <p>Open-source ngrok alternative. One command gives your local server a public HTTPS URL. No signup. No config. Just works.</p>
 
@@ -673,25 +753,44 @@
                 <div class="terminal-dot green"></div>
             </div>
             <div class="terminal-body">
-<span class="t-gray">$</span> wormhole http 3000
+                <span class="term-prompt"><span class="t-gray">$</span> <span class="term-cmd">wormhole http 3000</span></span>
 
-<span class="t-dim">  &#9608;   &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9604;&#9600;&#9608; &#9608;  &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;   &#9608;&#9600;&#9600;
-  &#9608;&#9604;&#9608;&#9604;&#9608; &#9608;  &#9608; &#9608;&#9604;&#9604;&#9600; &#9608; &#9608; &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;  &#9608; &#9608;   &#9608;&#9600;&#9600;
-  &#9600; &#9600; &#9600; &#9600;&#9600;&#9600;&#9600; &#9600; &#9600;&#9600; &#9600;   &#9600; &#9600;  &#9600; &#9600;&#9600;&#9600;&#9600; &#9600;&#9600;&#9600; &#9600;&#9600;&#9600;</span>
-  <span class="t-dim">v0.1.0</span>
+                <div class="term-info-box">
+                    <span class="label">Status</span>
+                    <span class="value"><span class="t-green">&#9679;</span> connected</span>
+                    <span class="label">Forwarding</span>
+                    <span class="value"><span class="t-cyan">https://k7x9m2.wormhole.bar</span> <span class="t-dim">&rarr; localhost:3000</span></span>
+                    <span class="label">Inspector</span>
+                    <span class="value"><span class="t-blue">http://localhost:4040</span></span>
+                </div>
 
-  <span class="t-dim">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
-  <span class="t-dim">&#9474;</span>       <span class="t-yellow">Status</span>  <span class="t-green">&#9679; connected</span>                        <span class="t-dim">&#9474;</span>
-  <span class="t-dim">&#9474;</span>   <span class="t-yellow">Forwarding</span>  <span class="t-cyan">https://k7x9m2.wormhole.bar</span> <span class="t-dim">&#8594; ...</span>  <span class="t-dim">&#9474;</span>
-  <span class="t-dim">&#9474;</span>    <span class="t-yellow">Inspector</span>  <span class="t-blue">http://localhost:4040</span>               <span class="t-dim">&#9474;</span>
-  <span class="t-dim">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
-
-  <span class="t-dim">Requests</span>
-  <span class="t-dim">&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</span>
-  <span class="t-green">GET</span>     /                          <span class="t-green">200</span>    <span class="t-dim">12ms</span>
-  <span class="t-purple">POST</span>    /webhooks/stripe           <span class="t-green">200</span>     <span class="t-dim">8ms</span>
-  <span class="t-green">GET</span>     /api/users                 <span class="t-green">200</span>    <span class="t-dim">34ms</span>
-  <span class="t-red">GET</span>     /api/missing               <span class="t-red">404</span>     <span class="t-dim">2ms</span>
+                <div class="term-requests">
+                    <div class="term-header">Requests</div>
+                    <div class="term-row">
+                        <span class="t-green">GET</span>
+                        <span class="t-dim">/</span>
+                        <span class="t-green">200</span>
+                        <span class="t-dim">12ms</span>
+                    </div>
+                    <div class="term-row">
+                        <span class="t-purple">POST</span>
+                        <span class="t-dim">/webhooks/stripe</span>
+                        <span class="t-green">200</span>
+                        <span class="t-dim">8ms</span>
+                    </div>
+                    <div class="term-row">
+                        <span class="t-green">GET</span>
+                        <span class="t-dim">/api/users</span>
+                        <span class="t-green">200</span>
+                        <span class="t-dim">34ms</span>
+                    </div>
+                    <div class="term-row">
+                        <span class="t-red">GET</span>
+                        <span class="t-dim">/api/missing</span>
+                        <span class="t-red">404</span>
+                        <span class="t-dim">2ms</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -840,20 +939,25 @@
             <h2>How it works</h2>
             <p class="section-desc">Your traffic flows through Cloudflare's global edge network, with a Durable Object holding your tunnel session.</p>
 
-            <div class="arch-diagram"><span class="a-green">YOUR LAPTOP</span>                       <span class="a-blue">CLOUDFLARE EDGE (300+ cities)</span>
-&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;                 &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
-&#9474;              &#9474;   <span class="a-purple">WebSocket</span>     &#9474;                             &#9474;
-&#9474;  <span class="a-green">wormhole</span>    &#9474;&#9668;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9658;&#9474;  <span class="a-blue">Worker</span> (request router)    &#9474;
-&#9474;  <span class="a-green">client</span>      &#9474;  <span class="a-yellow">(encrypted)</span>    &#9474;         &#8597;                   &#9474;
-&#9474;              &#9474;                 &#9474;  <span class="a-blue">Durable Object</span> (tunnel)    &#9474;
-&#9474;  localhost   &#9474;                 &#9474;  &#8226; Holds your WebSocket     &#9474;
-&#9474;  :3000       &#9474;                 &#9474;  &#8226; Proxies HTTP to you      &#9474;
-&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;                 &#9474;  &#8226; Hibernates when idle     &#9474;
-                                 &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
-                                                &#9474;
-                                   <span class="a-yellow">*.wormhole.bar</span> (Cloudflare DNS)
-                                                &#9474;
-                                        <span class="a-purple">Public Internet</span></div>
+            <div class="arch-visual">
+                <div class="arch-box">
+                    <div class="arch-box-title" style="color: var(--accent)">Your Laptop</div>
+                    <div class="arch-box-item" style="color: var(--accent)">wormhole client</div>
+                    <div class="arch-box-item">localhost:3000</div>
+                </div>
+                <div class="arch-connector">
+                    <span class="arch-arrow">&larr;&rarr;</span>
+                    <span>WebSocket</span>
+                    <span style="color: var(--yellow)">(encrypted)</span>
+                </div>
+                <div class="arch-box">
+                    <div class="arch-box-title" style="color: var(--blue)">Cloudflare Edge</div>
+                    <div class="arch-box-item" style="color: var(--blue)">Worker (router)</div>
+                    <div class="arch-box-item" style="color: var(--blue)">Durable Object (tunnel)</div>
+                    <div class="arch-box-item" style="color: var(--yellow)">*.wormhole.bar</div>
+                    <div class="arch-box-item">300+ cities worldwide</div>
+                </div>
+            </div>
 
             <div style="margin-top: 1.5rem">
                 <h3>The flow</h3>
