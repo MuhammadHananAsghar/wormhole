@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"syscall"
 	"time"
@@ -34,6 +35,7 @@ func main() {
 	rootCmd.AddCommand(logoutCmd())
 	rootCmd.AddCommand(statusCmd())
 	rootCmd.AddCommand(versionCmd())
+	rootCmd.AddCommand(uninstallCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -342,4 +344,75 @@ func versionCmd() *cobra.Command {
 			fmt.Printf("wormhole %s\n", version)
 		},
 	}
+}
+
+func uninstallCmd() *cobra.Command {
+	var purge bool
+
+	cmd := &cobra.Command{
+		Use:   "uninstall",
+		Short: "Remove wormhole from your system",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			// Find the binary path
+			binPath, err := os.Executable()
+			if err != nil {
+				return fmt.Errorf("finding wormhole binary: %w", err)
+			}
+			binPath, err = filepath.EvalSymlinks(binPath)
+			if err != nil {
+				return fmt.Errorf("resolving binary path: %w", err)
+			}
+
+			fmt.Printf("Binary: %s\n", binPath)
+			if purge {
+				configDir, _ := config.ConfigDir()
+				if configDir != "" {
+					fmt.Printf("Config: %s\n", configDir)
+				}
+			}
+
+			fmt.Print("\nRemove wormhole? [y/N] ")
+			var confirm string
+			fmt.Scanln(&confirm)
+			if confirm != "y" && confirm != "Y" {
+				fmt.Println("Cancelled.")
+				return nil
+			}
+
+			// Remove binary — may need sudo
+			if err := os.Remove(binPath); err != nil {
+				if os.IsPermission(err) {
+					fmt.Println("Permission denied. Trying with sudo...")
+					sudoCmd := exec.Command("sudo", "rm", binPath)
+					sudoCmd.Stdin = os.Stdin
+					sudoCmd.Stdout = os.Stdout
+					sudoCmd.Stderr = os.Stderr
+					if err := sudoCmd.Run(); err != nil {
+						return fmt.Errorf("removing binary with sudo: %w", err)
+					}
+				} else {
+					return fmt.Errorf("removing binary: %w", err)
+				}
+			}
+			fmt.Printf("Removed %s\n", binPath)
+
+			// Remove config directory if --purge
+			if purge {
+				configDir, err := config.ConfigDir()
+				if err == nil {
+					if err := os.RemoveAll(configDir); err != nil {
+						return fmt.Errorf("removing config directory: %w", err)
+					}
+					fmt.Printf("Removed %s\n", configDir)
+				}
+			}
+
+			fmt.Println("\nwormhole has been uninstalled.")
+			return nil
+		},
+	}
+
+	cmd.Flags().BoolVar(&purge, "purge", false, "Also remove config directory (~/.wormhole/)")
+
+	return cmd
 }

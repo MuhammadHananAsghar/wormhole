@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wormhole - Expose your localhost to the internet</title>
+    <meta name="description" content="Open-source ngrok alternative. One command gives your local server a public HTTPS URL instantly. No signup. No config. Just works.">
+    <meta name="keywords" content="wormhole, ngrok alternative, localhost tunnel, public URL, developer tools, open source">
+    <meta property="og:title" content="Wormhole - Expose your localhost to the internet">
+    <meta property="og:description" content="Open-source ngrok alternative. One command gives your local server a public HTTPS URL instantly.">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://wormhole.bar">
+    <link rel="canonical" href="https://wormhole.bar">
+    <style>
+        /* ========== CSS Variables ========== */
+        :root {
+            --font-mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+            --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            --max-width: 900px;
+            --transition: 0.3s ease;
+        }
+
+        [data-theme="dark"] {
+            --bg: #0a0a0a;
+            --bg-secondary: #111111;
+            --bg-code: #161616;
+            --bg-card: #141414;
+            --border: #222222;
+            --text: #e5e5e5;
+            --text-secondary: #888888;
+            --text-muted: #555555;
+            --accent: #22c55e;
+            --accent-dim: rgba(34, 197, 94, 0.1);
+            --accent-glow: rgba(34, 197, 94, 0.15);
+            --purple: #a78bfa;
+            --blue: #60a5fa;
+            --yellow: #fbbf24;
+            --red: #f87171;
+            --cyan: #22d3ee;
+            --logo-gradient-1: #22c55e;
+            --logo-gradient-2: #06b6d4;
+            --hero-glow: radial-gradient(ellipse 600px 300px at 50% 0%, rgba(34, 197, 94, 0.08), transparent);
+        }
+
+        [data-theme="light"] {
+            --bg: #fafafa;
+            --bg-secondary: #f3f4f6;
+            --bg-code: #f0f0f0;
+            --bg-card: #ffffff;
+            --border: #e0e0e0;
+            --text: #111111;
+            --text-secondary: #555555;
+            --text-muted: #999999;
+            --accent: #16a34a;
+            --accent-dim: rgba(22, 163, 74, 0.08);
+            --accent-glow: rgba(22, 163, 74, 0.1);
+            --purple: #7c3aed;
+            --blue: #2563eb;
+            --yellow: #d97706;
+            --red: #dc2626;
+            --cyan: #0891b2;
+            --logo-gradient-1: #16a34a;
+            --logo-gradient-2: #0891b2;
+            --hero-glow: radial-gradient(ellipse 600px 300px at 50% 0%, rgba(22, 163, 74, 0.06), transparent);
+        }
+
+        /* ========== Reset & Base ========== */
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+        html { scroll-behavior: smooth; }
+
+        body {
+            font-family: var(--font-sans);
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.7;
+            transition: background var(--transition), color var(--transition);
+            -webkit-font-smoothing: antialiased;
+        }
+
+        ::selection {
+            background: var(--accent);
+            color: #000;
+        }
+
+        a {
+            color: var(--accent);
+            text-decoration: none;
+            transition: opacity var(--transition);
+        }
+        a:hover { opacity: 0.8; }
+
+        /* ========== Nav ========== */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            transition: background var(--transition), border-color var(--transition);
+        }
+
+        [data-theme="dark"] nav { background: rgba(10, 10, 10, 0.85); }
+        [data-theme="light"] nav { background: rgba(250, 250, 250, 0.85); }
+
+        .nav-inner {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0.75rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .nav-logo {
+            font-family: var(--font-mono);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .nav-logo .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 8px var(--accent);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+        .nav-links a:hover { color: var(--text); opacity: 1; }
+
+        .theme-toggle {
+            background: none;
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+            cursor: pointer;
+            padding: 0.4rem 0.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            line-height: 1;
+            transition: all var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .theme-toggle:hover {
+            border-color: var(--text-muted);
+            color: var(--text);
+        }
+
+        /* ========== Container ========== */
+        .container {
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 0 1.5rem;
+        }
+
+        /* ========== Hero ========== */
+        .hero {
+            padding: 8rem 0 4rem;
+            text-align: center;
+            position: relative;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 400px;
+            background: var(--hero-glow);
+            pointer-events: none;
+        }
+
+        .hero-ascii {
+            font-family: var(--font-mono);
+            font-size: clamp(0.55rem, 2vw, 0.85rem);
+            line-height: 1.3;
+            letter-spacing: 0.05em;
+            background: linear-gradient(135deg, var(--logo-gradient-1), var(--logo-gradient-2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 1.5rem;
+            white-space: pre;
+            display: inline-block;
+        }
+
+        .hero h1 {
+            font-size: clamp(1.5rem, 4vw, 2.5rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+            line-height: 1.2;
+        }
+
+        .hero p {
+            font-size: 1.125rem;
+            color: var(--text-secondary);
+            max-width: 560px;
+            margin: 0 auto 2rem;
+        }
+
+        .hero-install {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.75rem;
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.75rem 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.9rem;
+            color: var(--text);
+            cursor: pointer;
+            transition: all var(--transition);
+            position: relative;
+        }
+        .hero-install:hover {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-dim);
+        }
+        .hero-install .prompt { color: var(--accent); }
+        .hero-install .copy-hint {
+            color: var(--text-muted);
+            font-size: 0.75rem;
+            padding-left: 0.75rem;
+            border-left: 1px solid var(--border);
+        }
+        .hero-install.copied .copy-hint { color: var(--accent); }
+
+        .hero-links {
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.25rem;
+            border-radius: 8px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            transition: all var(--transition);
+        }
+        .btn-primary {
+            background: var(--accent);
+            color: #000;
+        }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-secondary {
+            background: var(--bg-secondary);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { border-color: var(--text-muted); opacity: 1; }
+
+        /* ========== Terminal Demo ========== */
+        .terminal {
+            background: #0d0d0d;
+            border: 1px solid #222;
+            border-radius: 12px;
+            overflow: hidden;
+            margin: 3rem auto;
+            max-width: 680px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        [data-theme="light"] .terminal {
+            box-shadow: 0 20px 60px rgba(0,0,0,0.1);
+        }
+
+        .terminal-bar {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 12px 16px;
+            background: #161616;
+            border-bottom: 1px solid #222;
+        }
+        .terminal-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+        }
+        .terminal-dot.red { background: #ff5f57; }
+        .terminal-dot.yellow { background: #febc2e; }
+        .terminal-dot.green { background: #28c840; }
+
+        .terminal-body {
+            padding: 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.6;
+            color: #e5e5e5;
+            overflow-x: auto;
+        }
+        .terminal-body .t-green { color: #22c55e; }
+        .terminal-body .t-cyan { color: #22d3ee; }
+        .terminal-body .t-yellow { color: #fbbf24; }
+        .terminal-body .t-gray { color: #555; }
+        .terminal-body .t-dim { color: #666; }
+        .terminal-body .t-blue { color: #60a5fa; }
+        .terminal-body .t-red { color: #f87171; }
+        .terminal-body .t-purple { color: #a78bfa; }
+
+        /* ========== Sections ========== */
+        section {
+            padding: 4rem 0;
+        }
+
+        section + section {
+            border-top: 1px solid var(--border);
+        }
+
+        .section-label {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        h2 {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            letter-spacing: -0.02em;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .section-desc {
+            color: var(--text-secondary);
+            margin-bottom: 2.5rem;
+            max-width: 600px;
+        }
+
+        /* ========== Feature Grid ========== */
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+            gap: 1px;
+            background: var(--border);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .feature {
+            background: var(--bg-card);
+            padding: 1.5rem;
+            transition: background var(--transition);
+        }
+        .feature:hover {
+            background: var(--bg-secondary);
+        }
+
+        .feature-icon {
+            font-size: 1.25rem;
+            margin-bottom: 0.75rem;
+            width: 36px;
+            height: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--accent-dim);
+            border-radius: 8px;
+        }
+
+        .feature h3 {
+            font-size: 0.95rem;
+            margin-bottom: 0.35rem;
+        }
+
+        .feature p {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            line-height: 1.5;
+        }
+
+        /* ========== Install Section ========== */
+        .install-methods {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .install-method {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem 1.5rem;
+            transition: border-color var(--transition);
+        }
+        .install-method:hover {
+            border-color: var(--text-muted);
+        }
+
+        .install-method-label {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .install-method code {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--accent);
+        }
+
+        /* ========== Code Block ========== */
+        pre {
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.25rem;
+            overflow-x: auto;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.7;
+            margin: 1rem 0;
+        }
+
+        code {
+            font-family: var(--font-mono);
+            font-size: 0.85em;
+        }
+
+        /* ========== Architecture ========== */
+        .arch-diagram {
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            line-height: 1.5;
+            white-space: pre;
+            color: var(--text-secondary);
+            background: var(--bg-code);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 2rem;
+            overflow-x: auto;
+            margin: 1.5rem 0;
+        }
+        .arch-diagram .a-green { color: var(--accent); }
+        .arch-diagram .a-blue { color: var(--blue); }
+        .arch-diagram .a-purple { color: var(--purple); }
+        .arch-diagram .a-yellow { color: var(--yellow); }
+
+        /* ========== Comparison Table ========== */
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+            margin: 1.5rem 0;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .comparison-table th {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .comparison-table td:last-child {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .comparison-table tbody tr {
+            transition: background var(--transition);
+        }
+        .comparison-table tbody tr:hover {
+            background: var(--accent-dim);
+        }
+
+        .check { color: var(--accent); }
+        .cross { color: var(--text-muted); }
+
+        /* ========== CLI Reference ========== */
+        .cli-commands {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .cli-cmd {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 1rem;
+            align-items: baseline;
+            padding: 0.6rem 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.85rem;
+        }
+
+        .cli-cmd code {
+            color: var(--text);
+            font-size: 0.82rem;
+        }
+
+        .cli-cmd span {
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            text-align: right;
+        }
+
+        /* ========== Roadmap ========== */
+        .roadmap {
+            list-style: none;
+            display: grid;
+            gap: 0.75rem;
+        }
+
+        .roadmap li {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            font-size: 0.9rem;
+        }
+
+        .roadmap-check {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.7rem;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .roadmap-check.done {
+            background: var(--accent);
+            color: #000;
+        }
+        .roadmap-check.pending {
+            border: 2px solid var(--border);
+            color: var(--text-muted);
+        }
+
+        /* ========== Footer ========== */
+        footer {
+            padding: 3rem 0;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .footer-author {
+            font-size: 0.95rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        .footer-links a {
+            color: var(--text-secondary);
+            font-size: 0.85rem;
+        }
+        .footer-links a:hover { color: var(--text); }
+
+        .footer-sub {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        /* ========== Responsive ========== */
+        @media (max-width: 640px) {
+            .hero { padding: 6rem 0 3rem; }
+            .hero-install { flex-direction: column; gap: 0.5rem; }
+            .hero-install .copy-hint { border-left: none; padding-left: 0; }
+            .nav-links a.hide-mobile { display: none; }
+            .features-grid { grid-template-columns: 1fr; }
+            .cli-cmd { grid-template-columns: 1fr; gap: 0.25rem; }
+            .cli-cmd span { text-align: left; }
+            .comparison-table { font-size: 0.78rem; }
+            .comparison-table th, .comparison-table td { padding: 0.5rem; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Nav -->
+    <nav>
+        <div class="nav-inner">
+            <div class="nav-logo">
+                <span class="dot"></span>
+                wormhole
+            </div>
+            <div class="nav-links">
+                <a href="#features" class="hide-mobile">Features</a>
+                <a href="#install">Install</a>
+                <a href="#docs" class="hide-mobile">Docs</a>
+                <a href="https://github.com/MuhammadHananAsghar/wormhole" target="_blank">GitHub</a>
+                <button class="theme-toggle" onclick="toggleTheme()" aria-label="Toggle theme">
+                    <span id="theme-icon">&#9789;</span>
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero -->
+    <div class="container">
+        <section class="hero">
+            <div class="hero-ascii">
+  &#9608;   &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9604;&#9600;&#9608; &#9608;  &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;   &#9608;&#9600;&#9600;
+  &#9608;&#9604;&#9608;&#9604;&#9608; &#9608;  &#9608; &#9608;&#9604;&#9604;&#9600; &#9608; &#9608; &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;  &#9608; &#9608;   &#9608;&#9600;&#9600;
+  &#9600; &#9600; &#9600; &#9600;&#9600;&#9600;&#9600; &#9600; &#9600;&#9600; &#9600;   &#9600; &#9600;  &#9600; &#9600;&#9600;&#9600;&#9600; &#9600;&#9600;&#9600; &#9600;&#9600;&#9600;</div>
+            <h1>Expose your localhost<br>to the internet. Instantly.</h1>
+            <p>Open-source ngrok alternative. One command gives your local server a public HTTPS URL. No signup. No config. Just works.</p>
+
+            <div class="hero-install" onclick="copyInstall(this)">
+                <span><span class="prompt">$</span> curl -fsSL https://wormhole.bar/install.sh | sh</span>
+                <span class="copy-hint">click to copy</span>
+            </div>
+
+            <div class="hero-links">
+                <a href="#install" class="btn btn-primary">Get Started</a>
+                <a href="https://github.com/MuhammadHananAsghar/wormhole" target="_blank" class="btn btn-secondary">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg>
+                    GitHub
+                </a>
+            </div>
+        </section>
+    </div>
+
+    <!-- Terminal Demo -->
+    <div class="container">
+        <div class="terminal">
+            <div class="terminal-bar">
+                <div class="terminal-dot red"></div>
+                <div class="terminal-dot yellow"></div>
+                <div class="terminal-dot green"></div>
+            </div>
+            <div class="terminal-body">
+<span class="t-gray">$</span> wormhole http 3000
+
+<span class="t-dim">  &#9608;   &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9600;&#9608; &#9608;&#9600;&#9604;&#9600;&#9608; &#9608;  &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;   &#9608;&#9600;&#9600;
+  &#9608;&#9604;&#9608;&#9604;&#9608; &#9608;  &#9608; &#9608;&#9604;&#9604;&#9600; &#9608; &#9608; &#9608; &#9608;&#9600;&#9600;&#9608; &#9608;  &#9608; &#9608;   &#9608;&#9600;&#9600;
+  &#9600; &#9600; &#9600; &#9600;&#9600;&#9600;&#9600; &#9600; &#9600;&#9600; &#9600;   &#9600; &#9600;  &#9600; &#9600;&#9600;&#9600;&#9600; &#9600;&#9600;&#9600; &#9600;&#9600;&#9600;</span>
+  <span class="t-dim">v0.1.0</span>
+
+  <span class="t-dim">&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;</span>
+  <span class="t-dim">&#9474;</span>       <span class="t-yellow">Status</span>  <span class="t-green">&#9679; connected</span>                        <span class="t-dim">&#9474;</span>
+  <span class="t-dim">&#9474;</span>   <span class="t-yellow">Forwarding</span>  <span class="t-cyan">https://k7x9m2.wormhole.bar</span> <span class="t-dim">&#8594; ...</span>  <span class="t-dim">&#9474;</span>
+  <span class="t-dim">&#9474;</span>    <span class="t-yellow">Inspector</span>  <span class="t-blue">http://localhost:4040</span>               <span class="t-dim">&#9474;</span>
+  <span class="t-dim">&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;</span>
+
+  <span class="t-dim">Requests</span>
+  <span class="t-dim">&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;</span>
+  <span class="t-green">GET</span>     /                          <span class="t-green">200</span>    <span class="t-dim">12ms</span>
+  <span class="t-purple">POST</span>    /webhooks/stripe           <span class="t-green">200</span>     <span class="t-dim">8ms</span>
+  <span class="t-green">GET</span>     /api/users                 <span class="t-green">200</span>    <span class="t-dim">34ms</span>
+  <span class="t-red">GET</span>     /api/missing               <span class="t-red">404</span>     <span class="t-dim">2ms</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Features -->
+    <div class="container">
+        <section id="features">
+            <div class="section-label">Features</div>
+            <h2>Everything you need to tunnel</h2>
+            <p class="section-desc">Built for developers who need a public URL fast. No signup walls, no credit cards, no complex setup.</p>
+
+            <div class="features-grid">
+                <div class="feature">
+                    <div class="feature-icon">&#9889;</div>
+                    <h3>One Command</h3>
+                    <p><code>wormhole http 3000</code> and you're live. That's it.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128274;</div>
+                    <h3>HTTPS by Default</h3>
+                    <p>TLS handled automatically by Cloudflare's edge. Always secure.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#127760;</div>
+                    <h3>Custom Subdomains</h3>
+                    <p>Free custom subdomains with GitHub login. <code>myapp.wormhole.bar</code></p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128269;</div>
+                    <h3>Traffic Inspector</h3>
+                    <p>Built-in dashboard at localhost:4040 with live request stream.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128257;</div>
+                    <h3>Request Replay</h3>
+                    <p>Re-send any captured request to your local server with one click.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128230;</div>
+                    <h3>HAR Export</h3>
+                    <p>Export captured traffic in standard HAR format for analysis.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#127912;</div>
+                    <h3>Color-Coded TUI</h3>
+                    <p>Beautiful terminal UI with live request log, method and status colors.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128259;</div>
+                    <h3>Auto-Reconnect</h3>
+                    <p>Exponential backoff with seamless recovery. Set it and forget it.</p>
+                </div>
+                <div class="feature">
+                    <div class="feature-icon">&#128268;</div>
+                    <h3>WebSocket Support</h3>
+                    <p>Full WebSocket passthrough. Real-time apps work out of the box.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Install -->
+    <div class="container">
+        <section id="install">
+            <div class="section-label">Install</div>
+            <h2>Get started in seconds</h2>
+            <p class="section-desc">Choose your preferred method. Works on macOS and Linux. Windows coming soon.</p>
+
+            <div class="install-methods">
+                <div class="install-method">
+                    <div class="install-method-label">Quick install (macOS / Linux)</div>
+                    <code>curl -fsSL https://wormhole.bar/install.sh | sh</code>
+                </div>
+                <div class="install-method">
+                    <div class="install-method-label">Homebrew (macOS)</div>
+                    <code>brew install MuhammadHananAsghar/tap/wormhole</code>
+                </div>
+                <div class="install-method">
+                    <div class="install-method-label">Go install</div>
+                    <code>go install github.com/MuhammadHananAsghar/wormhole/cmd/wormhole@latest</code>
+                </div>
+                <div class="install-method">
+                    <div class="install-method-label">Build from source</div>
+                    <code>git clone https://github.com/MuhammadHananAsghar/wormhole.git && cd wormhole && go build -o wormhole ./cmd/wormhole</code>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Docs / CLI Reference -->
+    <div class="container">
+        <section id="docs">
+            <div class="section-label">Documentation</div>
+            <h2>CLI Reference</h2>
+            <p class="section-desc">All the commands you need.</p>
+
+            <div class="cli-commands">
+                <div class="cli-cmd">
+                    <code>wormhole http &lt;port&gt;</code>
+                    <span>Expose local HTTP server</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole http &lt;port&gt; --subdomain NAME</code>
+                    <span>Custom subdomain</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole http &lt;port&gt; --headless</code>
+                    <span>No TUI, plain log output</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole http &lt;port&gt; --inspect ADDR</code>
+                    <span>Custom inspector address</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole http &lt;port&gt; --no-inspect</code>
+                    <span>Disable traffic inspector</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole login</code>
+                    <span>Authenticate via GitHub</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole logout</code>
+                    <span>Remove stored credentials</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole status</code>
+                    <span>Show auth status</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole uninstall</code>
+                    <span>Remove wormhole from system</span>
+                </div>
+                <div class="cli-cmd">
+                    <code>wormhole version</code>
+                    <span>Print version</span>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- How It Works -->
+    <div class="container">
+        <section id="architecture">
+            <div class="section-label">Architecture</div>
+            <h2>How it works</h2>
+            <p class="section-desc">Your traffic flows through Cloudflare's global edge network, with a Durable Object holding your tunnel session.</p>
+
+            <div class="arch-diagram"><span class="a-green">YOUR LAPTOP</span>                       <span class="a-blue">CLOUDFLARE EDGE (300+ cities)</span>
+&#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;                 &#9484;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9488;
+&#9474;              &#9474;   <span class="a-purple">WebSocket</span>     &#9474;                             &#9474;
+&#9474;  <span class="a-green">wormhole</span>    &#9474;&#9668;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9658;&#9474;  <span class="a-blue">Worker</span> (request router)    &#9474;
+&#9474;  <span class="a-green">client</span>      &#9474;  <span class="a-yellow">(encrypted)</span>    &#9474;         &#8597;                   &#9474;
+&#9474;              &#9474;                 &#9474;  <span class="a-blue">Durable Object</span> (tunnel)    &#9474;
+&#9474;  localhost   &#9474;                 &#9474;  &#8226; Holds your WebSocket     &#9474;
+&#9474;  :3000       &#9474;                 &#9474;  &#8226; Proxies HTTP to you      &#9474;
+&#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;                 &#9474;  &#8226; Hibernates when idle     &#9474;
+                                 &#9492;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9516;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9472;&#9496;
+                                                &#9474;
+                                   <span class="a-yellow">*.wormhole.bar</span> (Cloudflare DNS)
+                                                &#9474;
+                                        <span class="a-purple">Public Internet</span></div>
+
+            <div style="margin-top: 1.5rem">
+                <h3>The flow</h3>
+                <ol style="color: var(--text-secondary); font-size: 0.9rem; padding-left: 1.25rem; line-height: 2">
+                    <li>Client opens WebSocket to nearest Cloudflare edge</li>
+                    <li>Durable Object assigns a unique subdomain</li>
+                    <li>HTTP requests to <code>*.wormhole.bar</code> hit the Worker</li>
+                    <li>Worker routes to the correct Durable Object</li>
+                    <li>DO serializes the request over WebSocket to your client</li>
+                    <li>Client forwards to <code>localhost:3000</code></li>
+                    <li>Response flows back the same path</li>
+                </ol>
+            </div>
+        </section>
+    </div>
+
+    <!-- Comparison -->
+    <div class="container">
+        <section id="comparison">
+            <div class="section-label">Comparison</div>
+            <h2>How Wormhole stacks up</h2>
+
+            <div style="overflow-x: auto">
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Feature</th>
+                            <th>ngrok (free)</th>
+                            <th>Cloudflare Tunnel</th>
+                            <th>Wormhole</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>One-command setup</td>
+                            <td>Needs signup</td>
+                            <td>Needs CF account</td>
+                            <td>Just works</td>
+                        </tr>
+                        <tr>
+                            <td>Custom subdomains</td>
+                            <td>Paid ($8/mo)</td>
+                            <td>Yes (complex)</td>
+                            <td>Free</td>
+                        </tr>
+                        <tr>
+                            <td>HTTPS</td>
+                            <td><span class="check">&#10003;</span></td>
+                            <td><span class="check">&#10003;</span></td>
+                            <td><span class="check">&#10003;</span></td>
+                        </tr>
+                        <tr>
+                            <td>Traffic inspector</td>
+                            <td>Basic</td>
+                            <td><span class="cross">&#10005;</span></td>
+                            <td>Full (replay, HAR)</td>
+                        </tr>
+                        <tr>
+                            <td>WebSocket support</td>
+                            <td><span class="check">&#10003;</span></td>
+                            <td><span class="check">&#10003;</span></td>
+                            <td><span class="check">&#10003;</span></td>
+                        </tr>
+                        <tr>
+                            <td>Open source</td>
+                            <td><span class="cross">&#10005;</span></td>
+                            <td>Client only</td>
+                            <td>Fully open source</td>
+                        </tr>
+                        <tr>
+                            <td>Cost</td>
+                            <td>$0-120/yr</td>
+                            <td>$0 (complex)</td>
+                            <td>$0</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <!-- Roadmap -->
+    <div class="container">
+        <section id="roadmap">
+            <div class="section-label">Roadmap</div>
+            <h2>What's coming next</h2>
+
+            <ul class="roadmap">
+                <li>
+                    <span class="roadmap-check done">&#10003;</span>
+                    <div><strong>Phase 1</strong> &mdash; Core tunnel (<code>wormhole http 3000</code> &#8594; public URL)</div>
+                </li>
+                <li>
+                    <span class="roadmap-check done">&#10003;</span>
+                    <div><strong>Phase 2</strong> &mdash; HTTPS, custom subdomains, GitHub OAuth</div>
+                </li>
+                <li>
+                    <span class="roadmap-check done">&#10003;</span>
+                    <div><strong>Phase 3</strong> &mdash; Traffic inspector, replay, HAR export</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 4</strong> &mdash; API keys, rate limiting</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 5</strong> &mdash; Self-hosted relay + TCP tunnels</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 6</strong> &mdash; P2P mode (direct connections, no relay)</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 7</strong> &mdash; Polish (CI/CD, Homebrew, docs)</div>
+                </li>
+            </ul>
+        </section>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-author">
+                Built by <a href="https://github.com/MuhammadHananAsghar"><strong>Muhammad Hanan Asghar</strong></a>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/MuhammadHananAsghar/wormhole">GitHub</a>
+                <a href="https://www.linkedin.com/in/muhammadhananasghar/">LinkedIn</a>
+                <a href="https://github.com/MuhammadHananAsghar/wormhole/blob/main/LICENSE">MIT License</a>
+            </div>
+            <div class="footer-sub">
+                Built with Go + Cloudflare Workers. Runs on the edge.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Theme toggle
+        function getPreferredTheme() {
+            const stored = localStorage.getItem('theme');
+            if (stored) return stored;
+            return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('theme', theme);
+            document.getElementById('theme-icon').innerHTML = theme === 'dark' ? '&#9789;' : '&#9788;';
+        }
+
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        }
+
+        // Init theme
+        setTheme(getPreferredTheme());
+
+        // Copy install command
+        function copyInstall(el) {
+            const text = 'curl -fsSL https://wormhole.bar/install.sh | sh';
+            navigator.clipboard.writeText(text).then(() => {
+                el.classList.add('copied');
+                el.querySelector('.copy-hint').textContent = 'copied!';
+                setTimeout(() => {
+                    el.classList.remove('copied');
+                    el.querySelector('.copy-hint').textContent = 'click to copy';
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+</html>

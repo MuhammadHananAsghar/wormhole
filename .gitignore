@@ -1,6 +1,6 @@
 # Binaries
-wormhole
-wormhole.exe
+/wormhole
+/wormhole.exe
 dist/
 
 # Go
