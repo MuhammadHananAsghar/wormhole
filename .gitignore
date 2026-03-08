@@ -24,6 +24,7 @@ node_modules/
 Thumbs.db
 
 # Claude Code
+CLAUDE.md
 .agents/
 .claude/
 skills-lock.json
@@ -36,3 +37,4 @@ Wormhole_Project_Plan.md
 
 # Config (user-specific)
 config.json
+*.pdf
