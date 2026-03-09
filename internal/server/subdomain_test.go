@@ -229,6 +229,71 @@ func TestSystemReserved(t *testing.T) {
 	assert.False(t, store.IsSystemReserved("myapp"))
 }
 
+func TestCountByUser(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	count, err := store.CountByUser(ctx, "user1")
+	require.NoError(t, err)
+	assert.Equal(t, 0, count)
+
+	require.NoError(t, store.Reserve(ctx, "app1", "user1"))
+	require.NoError(t, store.Reserve(ctx, "app2", "user1"))
+
+	count, err = store.CountByUser(ctx, "user1")
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+
+	// Other user's subdomains don't count
+	require.NoError(t, store.Reserve(ctx, "other", "user2"))
+	count, err = store.CountByUser(ctx, "user1")
+	require.NoError(t, err)
+	assert.Equal(t, 2, count)
+}
+
+func TestReserve_LimitReached(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	// Reserve max allowed
+	require.NoError(t, store.Reserve(ctx, "app1", "user1"))
+	require.NoError(t, store.Reserve(ctx, "app2", "user1"))
+	require.NoError(t, store.Reserve(ctx, "app3", "user1"))
+
+	// 4th should fail
+	err := store.Reserve(ctx, "app4", "user1")
+	assert.Error(t, err)
+	assert.ErrorIs(t, err, ErrLimitReached)
+
+	// Re-reserving existing one should still work (no-op)
+	err = store.Reserve(ctx, "app1", "user1")
+	assert.NoError(t, err)
+
+	// Different user can still reserve
+	err = store.Reserve(ctx, "app4", "user2")
+	assert.NoError(t, err)
+}
+
+func TestReserve_LimitAfterRelease(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	require.NoError(t, store.Reserve(ctx, "app1", "user1"))
+	require.NoError(t, store.Reserve(ctx, "app2", "user1"))
+	require.NoError(t, store.Reserve(ctx, "app3", "user1"))
+
+	// At limit — release one
+	require.NoError(t, store.Release(ctx, "app2", "user1"))
+
+	// Now can reserve a new one
+	err := store.Reserve(ctx, "app4", "user1")
+	assert.NoError(t, err)
+
+	// But not another
+	err = store.Reserve(ctx, "app5", "user1")
+	assert.ErrorIs(t, err, ErrLimitReached)
+}
+
 func TestValidateSubdomain(t *testing.T) {
 	tests := []struct {
 		subdomain string

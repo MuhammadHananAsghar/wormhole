@@ -21,6 +21,7 @@ interface HttpResponseMessage {
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
+const MAX_SUBDOMAINS_PER_USER = 3;
 
 export class Tunnel implements DurableObject {
   private clientWs: WebSocket | null = null;
@@ -369,6 +370,27 @@ export class Tunnel implements DurableObject {
           error: `Subdomain "${requested}" is already in use.`,
         }));
         return;
+      }
+
+      // Auto-reserve on first use (if not already reserved by this user)
+      if (!reservedRow) {
+        // Enforce per-user limit (max 3 custom subdomains)
+        const countRow = await this.env.DB.prepare(
+          "SELECT COUNT(*) as cnt FROM reserved_subdomains WHERE user_id = ?"
+        ).bind(auth.githubId).first<{ cnt: number }>();
+        const currentCount = countRow?.cnt ?? 0;
+        if (currentCount >= MAX_SUBDOMAINS_PER_USER) {
+          ws.send(JSON.stringify({
+            type: "register_error",
+            error: `Subdomain limit reached (max ${MAX_SUBDOMAINS_PER_USER} per user). Release an existing subdomain first.`,
+          }));
+          return;
+        }
+
+        // Auto-reserve this subdomain for the user
+        await this.env.DB.prepare(
+          "INSERT INTO reserved_subdomains (subdomain, user_id) VALUES (?, ?)"
+        ).bind(requested, auth.githubId).run();
       }
 
       this.subdomain = requested;

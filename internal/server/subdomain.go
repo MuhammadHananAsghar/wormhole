@@ -10,10 +10,15 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+// MaxSubdomainsPerUser is the maximum number of custom subdomains a single user
+// can reserve. Applies to both CF (D1) and self-hosted (SQLite) modes.
+const MaxSubdomainsPerUser = 3
+
 // Errors returned by SubdomainStore operations.
 var (
-	ErrSubdomainTaken = errors.New("subdomain is reserved by another user")
-	ErrNotOwner       = errors.New("subdomain is not owned by this user")
+	ErrSubdomainTaken  = errors.New("subdomain is reserved by another user")
+	ErrNotOwner        = errors.New("subdomain is not owned by this user")
+	ErrLimitReached    = fmt.Errorf("subdomain limit reached (max %d per user)", MaxSubdomainsPerUser)
 )
 
 // SubdomainStore manages subdomain reservations and active tunnel tracking.
@@ -50,6 +55,9 @@ type SubdomainStore interface {
 
 	// ListByUser returns all subdomains reserved by a user.
 	ListByUser(ctx context.Context, userID string) ([]string, error)
+
+	// CountByUser returns the number of subdomains reserved by a user.
+	CountByUser(ctx context.Context, userID string) (int, error)
 
 	// IsSystemReserved returns true if the subdomain is a system-reserved name.
 	IsSystemReserved(subdomain string) bool
@@ -146,6 +154,15 @@ func (s *SQLiteSubdomainStore) Reserve(ctx context.Context, subdomain, userID st
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("checking reservation: %w", err)
+	}
+
+	// Enforce per-user limit before inserting
+	count, err := s.CountByUser(ctx, userID)
+	if err != nil {
+		return fmt.Errorf("counting user subdomains: %w", err)
+	}
+	if count >= MaxSubdomainsPerUser {
+		return ErrLimitReached
 	}
 
 	_, err = s.db.ExecContext(ctx,
@@ -291,6 +308,17 @@ func (s *SQLiteSubdomainStore) ListByUser(ctx context.Context, userID string) ([
 		subs = append(subs, sub)
 	}
 	return subs, rows.Err()
+}
+
+func (s *SQLiteSubdomainStore) CountByUser(ctx context.Context, userID string) (int, error) {
+	var count int
+	err := s.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM reserved_subdomains WHERE user_id = ?", userID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("counting user subdomains: %w", err)
+	}
+	return count, nil
 }
 
 func (s *SQLiteSubdomainStore) IsSystemReserved(subdomain string) bool {

@@ -93,4 +93,31 @@ func TestRegistrationFlow_MatchesCFBehavior(t *testing.T) {
 	subs, err := store2.ListByUser(ctx, "user_github_123")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"myapp"}, subs)
+
+	// === Scenario 7: Auto-reserve + rate limit (matches edge behavior) ===
+	// User reserves 2 more subdomains (already has "myapp" = 1)
+	err = store2.Reserve(ctx, "second", "user_github_123")
+	require.NoError(t, err)
+	err = store2.Reserve(ctx, "third", "user_github_123")
+	require.NoError(t, err)
+
+	// 4th subdomain should fail — limit is 3
+	err = store2.Reserve(ctx, "fourth", "user_github_123")
+	assert.ErrorIs(t, err, ErrLimitReached)
+
+	// Verify count
+	count, err := store2.CountByUser(ctx, "user_github_123")
+	require.NoError(t, err)
+	assert.Equal(t, 3, count)
+
+	// Release one, then reserve again — should work
+	err = store2.Release(ctx, "second", "user_github_123")
+	require.NoError(t, err)
+
+	err = store2.Reserve(ctx, "replacement", "user_github_123")
+	assert.NoError(t, err, "should succeed after releasing a slot")
+
+	// Another user is unaffected by first user's limit
+	err = store2.Reserve(ctx, "other1", "user_github_456")
+	assert.NoError(t, err)
 }
