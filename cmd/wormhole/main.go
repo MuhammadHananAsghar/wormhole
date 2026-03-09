@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -37,6 +39,7 @@ func main() {
 	rootCmd.AddCommand(statusCmd())
 	rootCmd.AddCommand(versionCmd())
 	rootCmd.AddCommand(uninstallCmd())
+	rootCmd.AddCommand(updateCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
@@ -449,4 +452,207 @@ func uninstallCmd() *cobra.Command {
 	cmd.Flags().BoolVar(&purge, "purge", false, "Also remove config directory (~/.wormhole/)")
 
 	return cmd
+}
+
+// ── update command ────────────────────────────────────────────────────────────
+
+func updateCmd() *cobra.Command {
+	return &cobra.Command{
+		Use:   "update",
+		Short: "Update wormhole to the latest version",
+		Long: `Check for the latest version and update the wormhole binary in place.
+Detects the install method (Homebrew, curl, go install) and uses the appropriate update path.`,
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runUpdate()
+		},
+	}
+}
+
+func runUpdate() error {
+	fmt.Printf("wormhole %s — checking for updates...\n\n", version)
+
+	latest, downloadURL, err := fetchLatestRelease()
+	if err != nil {
+		return fmt.Errorf("checking latest release: %w", err)
+	}
+
+	if latest == version {
+		fmt.Printf("  Already up to date (v%s).\n", version)
+		return nil
+	}
+
+	fmt.Printf("  New version available: %s → %s\n\n", version, latest)
+
+	// 1. Homebrew?
+	if brewOut, berr := exec.Command("brew", "list", "--formula").Output(); berr == nil {
+		if strings.Contains(string(brewOut), "wormhole") {
+			fmt.Println("  Updating via Homebrew...")
+			cmd := exec.Command("brew", "upgrade", "MuhammadHananAsghar/tap/wormhole")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("brew upgrade failed: %w", err)
+			}
+			fmt.Printf("\n  Updated to %s via Homebrew.\n", latest)
+			return nil
+		}
+	}
+
+	// 2. go install?
+	if gopath := os.Getenv("GOPATH"); gopath != "" {
+		gobin := filepath.Join(gopath, "bin", "wormhole")
+		if self, _ := os.Executable(); self == gobin {
+			fmt.Println("  Updating via go install...")
+			cmd := exec.Command("go", "install", "github.com/MuhammadHananAsghar/wormhole/cmd/wormhole@latest")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("go install failed: %w", err)
+			}
+			fmt.Printf("\n  Updated to %s via go install.\n", latest)
+			return nil
+		}
+	}
+	if home, _ := os.UserHomeDir(); home != "" {
+		gobin := filepath.Join(home, "go", "bin", "wormhole")
+		if self, _ := os.Executable(); self == gobin {
+			fmt.Println("  Updating via go install...")
+			cmd := exec.Command("go", "install", "github.com/MuhammadHananAsghar/wormhole/cmd/wormhole@latest")
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			if err := cmd.Run(); err != nil {
+				return fmt.Errorf("go install failed: %w", err)
+			}
+			fmt.Printf("\n  Updated to %s via go install.\n", latest)
+			return nil
+		}
+	}
+
+	// 3. Direct binary replacement.
+	if downloadURL == "" {
+		return fmt.Errorf("no compatible binary found for %s/%s in the latest release", runtime.GOOS, runtime.GOARCH)
+	}
+
+	self, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("cannot determine current binary path: %w", err)
+	}
+
+	fmt.Printf("  Downloading %s...\n", downloadURL)
+
+	tmpDir, err := os.MkdirTemp("", "wormhole-update-*")
+	if err != nil {
+		return fmt.Errorf("creating temp dir: %w", err)
+	}
+	defer os.RemoveAll(tmpDir)
+
+	archivePath := filepath.Join(tmpDir, "wormhole.tar.gz")
+	if err := downloadFile(downloadURL, archivePath); err != nil {
+		return fmt.Errorf("download failed: %w", err)
+	}
+
+	extractCmd := exec.Command("tar", "-xzf", archivePath, "-C", tmpDir)
+	if out, err := extractCmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("extraction failed: %s", strings.TrimSpace(string(out)))
+	}
+
+	newBinary := filepath.Join(tmpDir, "wormhole")
+	if _, err := os.Stat(newBinary); err != nil {
+		return fmt.Errorf("extracted binary not found")
+	}
+
+	fmt.Printf("  Replacing %s...\n", self)
+	if err := replaceBinary(self, newBinary); err != nil {
+		return fmt.Errorf("replacing binary: %w", err)
+	}
+
+	fmt.Printf("\n  Updated to %s.\n", latest)
+	return nil
+}
+
+func fetchLatestRelease() (string, string, error) {
+	apiURL := "https://api.github.com/repos/MuhammadHananAsghar/wormhole/releases/latest"
+	resp, err := http.Get(apiURL)
+	if err != nil {
+		return "", "", err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return "", "", fmt.Errorf("GitHub API returned %d", resp.StatusCode)
+	}
+
+	var release struct {
+		TagName string `json:"tag_name"`
+		Assets  []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return "", "", err
+	}
+
+	ver := strings.TrimPrefix(release.TagName, "v")
+
+	archiveName := fmt.Sprintf("wormhole_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	var downloadURL string
+	for _, a := range release.Assets {
+		if a.Name == archiveName {
+			downloadURL = a.BrowserDownloadURL
+			break
+		}
+	}
+
+	return ver, downloadURL, nil
+}
+
+func downloadFile(url, dest string) error {
+	resp, err := http.Get(url)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return fmt.Errorf("HTTP %d", resp.StatusCode)
+	}
+
+	f, err := os.Create(dest)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+
+	_, err = io.Copy(f, resp.Body)
+	return err
+}
+
+func replaceBinary(oldPath, newPath string) error {
+	if err := os.Chmod(newPath, 0o755); err != nil {
+		return err
+	}
+
+	if err := os.Rename(newPath, oldPath); err == nil {
+		return nil
+	}
+
+	src, err := os.Open(newPath)
+	if err != nil {
+		return err
+	}
+	defer src.Close()
+
+	dst, err := os.OpenFile(oldPath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o755)
+	if err != nil {
+		// Need sudo.
+		cmd := exec.Command("sudo", "cp", newPath, oldPath)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+	defer dst.Close()
+
+	_, err = io.Copy(dst, src)
+	return err
 }
