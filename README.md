@@ -242,13 +242,20 @@ go test ./... -cover
 
 ## Roadmap
 
-- [x] **Phase 1** — Core tunnel (`wormhole http 3000` -> public URL)
-- [x] **Phase 2** — HTTPS, custom subdomains, GitHub OAuth
-- [x] **Phase 3** — Traffic inspector, replay, HAR export
-- [ ] **Phase 4** — API keys, rate limiting
-- [ ] **Phase 5** — Self-hosted relay + TCP tunnels
-- [ ] **Phase 6** — P2P mode (direct connections, no relay)
-- [ ] **Phase 7** — Polish (CI/CD, Homebrew, docs)
+Wormhole is built on a **dual-track architecture**: Cloudflare Workers (free, no setup) + self-hosted Go relay (full control, unlimited scale).
+
+- [x] **Phase 1** — Core tunnel (`wormhole http 3000` → public URL, WebSocket passthrough)
+- [x] **Phase 2** — HTTPS, custom subdomains (auto-reserve, 3/user limit), GitHub OAuth
+- [x] **Phase 3** — Traffic inspector, request replay, HAR export, curl generation
+- [ ] **Phase 4** — Self-hosted Go relay (`wormhole server`, QUIC transport, SQLite persistence)
+- [ ] **Phase 5** — Auth & multi-user (API keys, team tokens, CF + self-hosted middleware)
+- [ ] **Phase 6** — Stream multiplexing (virtual streams over single WebSocket, backpressure)
+- [ ] **Phase 7** — Plugin system (request/response pipeline, custom auth, transforms)
+- [ ] **Phase 8** — Observability (Prometheus metrics, structured logs, health endpoints)
+- [ ] **Phase 9** — Protocol evolution (version negotiation, TLS pinning, binary framing)
+- [ ] **Phase 10** — Enterprise hardening (connection limits, mTLS, audit logs, RBAC)
+- [ ] **Phase 11** — P2P mode (`wormhole share`, WebRTC direct connections, no relay)
+- [ ] **Phase 12** — Polish & ship (homepage, docs site, video demos, package registries)
 
 ## Author
 

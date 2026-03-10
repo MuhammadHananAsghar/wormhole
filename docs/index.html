@@ -1053,31 +1053,51 @@
             <ul class="roadmap">
                 <li>
                     <span class="roadmap-check done">&#10003;</span>
-                    <div><strong>Phase 1</strong> &mdash; Core tunnel (<code>wormhole http 3000</code> &#8594; public URL)</div>
+                    <div><strong>Phase 1</strong> &mdash; Core tunnel (<code>wormhole http 3000</code> &#8594; public URL, WebSocket passthrough)</div>
                 </li>
                 <li>
                     <span class="roadmap-check done">&#10003;</span>
-                    <div><strong>Phase 2</strong> &mdash; HTTPS, custom subdomains, GitHub OAuth</div>
+                    <div><strong>Phase 2</strong> &mdash; HTTPS, custom subdomains (auto-reserve, 3/user limit), GitHub OAuth</div>
                 </li>
                 <li>
                     <span class="roadmap-check done">&#10003;</span>
-                    <div><strong>Phase 3</strong> &mdash; Traffic inspector, replay, HAR export</div>
+                    <div><strong>Phase 3</strong> &mdash; Traffic inspector, request replay, HAR export, curl generation</div>
                 </li>
                 <li>
                     <span class="roadmap-check pending">&nbsp;</span>
-                    <div><strong>Phase 4</strong> &mdash; API keys, rate limiting</div>
+                    <div><strong>Phase 4</strong> &mdash; Self-hosted Go relay (<code>wormhole server</code>, QUIC transport, SQLite persistence)</div>
                 </li>
                 <li>
                     <span class="roadmap-check pending">&nbsp;</span>
-                    <div><strong>Phase 5</strong> &mdash; Self-hosted relay + TCP tunnels</div>
+                    <div><strong>Phase 5</strong> &mdash; Auth &amp; multi-user (API keys, team tokens, CF + self-hosted middleware)</div>
                 </li>
                 <li>
                     <span class="roadmap-check pending">&nbsp;</span>
-                    <div><strong>Phase 6</strong> &mdash; P2P mode (direct connections, no relay)</div>
+                    <div><strong>Phase 6</strong> &mdash; Stream multiplexing (virtual streams over single WebSocket, backpressure)</div>
                 </li>
                 <li>
                     <span class="roadmap-check pending">&nbsp;</span>
-                    <div><strong>Phase 7</strong> &mdash; Polish (CI/CD, Homebrew, docs)</div>
+                    <div><strong>Phase 7</strong> &mdash; Plugin system (request/response pipeline, custom auth, transforms)</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 8</strong> &mdash; Observability (Prometheus metrics, structured logs, health endpoints)</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 9</strong> &mdash; Protocol evolution (version negotiation, TLS pinning, binary framing)</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 10</strong> &mdash; Enterprise hardening (connection limits, mTLS, audit logs, RBAC)</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 11</strong> &mdash; P2P mode (<code>wormhole share</code>, WebRTC direct connections, no relay)</div>
+                </li>
+                <li>
+                    <span class="roadmap-check pending">&nbsp;</span>
+                    <div><strong>Phase 12</strong> &mdash; Polish &amp; ship (homepage, docs site, video demos, package registries)</div>
                 </li>
             </ul>
         </section>
