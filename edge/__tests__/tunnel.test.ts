@@ -173,6 +173,51 @@ describe("Tunnel Durable Object", () => {
       ws.close();
     });
 
+    it("reclaims custom subdomain when prior tunnel is stale", async () => {
+      const testToken = "test-token-999";
+      await env.DB.prepare(
+        "INSERT OR REPLACE INTO users (github_id, username, token) VALUES (?, ?, ?)"
+      ).bind("999", "staleuser", testToken).run();
+      await env.DB.prepare(
+        "INSERT OR REPLACE INTO reserved_subdomains (subdomain, user_id) VALUES (?, ?)"
+      ).bind("myapp", "999").run();
+
+      const staleId = env.TUNNEL.newUniqueId();
+      await env.DB.prepare(
+        "INSERT OR REPLACE INTO tunnels (subdomain, client_id) VALUES (?, ?)"
+      ).bind("myapp", staleId.toString()).run();
+
+      const stub = getStub();
+      const response = await stub.fetch(`https://${DOMAIN}/_wormhole/register`, {
+        headers: { Upgrade: "websocket" },
+      });
+
+      const ws = response.webSocket!;
+      ws.accept();
+
+      const messagePromise = new Promise<string>((resolve) => {
+        ws.addEventListener("message", (event) => {
+          resolve(event.data as string);
+        });
+      });
+
+      ws.send(JSON.stringify({ type: "register", protocol: "http", subdomain: "myapp", token: testToken }));
+
+      const msg = await messagePromise;
+      const parsed = JSON.parse(msg);
+
+      expect(parsed.type).toBe("registered");
+      expect(parsed.subdomain).toBe("myapp");
+
+      const row = await env.DB.prepare(
+        "SELECT client_id FROM tunnels WHERE subdomain = ?"
+      ).bind("myapp").first<{ client_id: string }>();
+      expect(row).not.toBeNull();
+      expect(row!.client_id).not.toBe(staleId.toString());
+
+      ws.close();
+    });
+
     it("rejects reserved system subdomains", async () => {
       const testToken = "test-token-12345";
       await env.DB.prepare(

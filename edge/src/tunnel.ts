@@ -22,6 +22,8 @@ interface HttpResponseMessage {
 
 const REQUEST_TIMEOUT_MS = 30_000;
 const MAX_SUBDOMAINS_PER_USER = 3;
+const INTERNAL_STATUS_HEADER = "x-wormhole-internal";
+const INTERNAL_STATUS_VALUE = "status";
 
 export class Tunnel implements DurableObject {
   private clientWs: WebSocket | null = null;
@@ -37,6 +39,10 @@ export class Tunnel implements DurableObject {
 
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
+
+    if (url.pathname === "/_wormhole/status" && request.headers.get(INTERNAL_STATUS_HEADER) === INTERNAL_STATUS_VALUE) {
+      return this.handleStatus();
+    }
 
     // Handle WebSocket upgrade for tunnel registration
     if (url.pathname === "/_wormhole/register") {
@@ -244,18 +250,7 @@ export class Tunnel implements DurableObject {
   async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean): Promise<void> {
     this.clientWs = null;
 
-    // Recover subdomain from storage if lost during hibernation
-    if (!this.subdomain) {
-      this.subdomain = (await this.state.storage.get<string>("subdomain")) ?? null;
-    }
-
-    // Remove subdomain from D1 and storage
-    if (this.subdomain) {
-      await this.env.DB.prepare("DELETE FROM tunnels WHERE subdomain = ?")
-        .bind(this.subdomain).run();
-      await this.state.storage.delete("subdomain");
-      this.subdomain = null;
-    }
+    await this.cleanupSubdomain();
 
     // Reject all pending requests
     for (const [id, pending] of this.pendingRequests) {
@@ -363,13 +358,19 @@ export class Tunnel implements DurableObject {
       // Check if subdomain is already in use by an active tunnel
       const active = await this.env.DB.prepare(
         "SELECT client_id FROM tunnels WHERE subdomain = ?"
-      ).bind(requested).first();
+      ).bind(requested).first<{ client_id: string }>();
       if (active) {
-        ws.send(JSON.stringify({
-          type: "register_error",
-          error: `Subdomain "${requested}" is already in use.`,
-        }));
-        return;
+        const isActive = await this.isTunnelActive(active.client_id);
+        if (isActive) {
+          ws.send(JSON.stringify({
+            type: "register_error",
+            error: `Subdomain "${requested}" is already in use.`,
+          }));
+          return;
+        }
+        await this.env.DB.prepare(
+          "DELETE FROM tunnels WHERE subdomain = ?"
+        ).bind(requested).run();
       }
 
       // Auto-reserve on first use (if not already reserved by this user)
@@ -439,6 +440,54 @@ export class Tunnel implements DurableObject {
       status: message.status,
       headers,
     }));
+  }
+
+  private isClientConnected(): boolean {
+    const ws = this.getClientWs();
+    return !!ws && ws.readyState === WebSocket.OPEN;
+  }
+
+  private async handleStatus(): Promise<Response> {
+    const connected = this.isClientConnected();
+    if (!connected) {
+      await this.cleanupSubdomain();
+    }
+    return new Response(JSON.stringify({ connected }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  private async cleanupSubdomain(): Promise<void> {
+    if (!this.subdomain) {
+      this.subdomain = (await this.state.storage.get<string>("subdomain")) ?? null;
+    }
+
+    if (!this.subdomain) {
+      return;
+    }
+
+    await this.env.DB.prepare("DELETE FROM tunnels WHERE subdomain = ?")
+      .bind(this.subdomain).run();
+    await this.state.storage.delete("subdomain");
+    this.subdomain = null;
+  }
+
+  private async isTunnelActive(clientId: string): Promise<boolean> {
+    try {
+      const id = this.env.TUNNEL.idFromString(clientId);
+      const stub = this.env.TUNNEL.get(id);
+      const response = await stub.fetch("https://internal/_wormhole/status", {
+        headers: { [INTERNAL_STATUS_HEADER]: INTERNAL_STATUS_VALUE },
+      });
+      if (!response.ok) {
+        return true;
+      }
+      const data = await response.json<{ connected?: boolean }>();
+      return data.connected === true;
+    } catch {
+      return true;
+    }
   }
 }
 
