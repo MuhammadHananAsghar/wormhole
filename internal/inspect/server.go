@@ -23,14 +23,40 @@ type Server struct {
 
 // NewServer creates an inspector server.
 func NewServer(recorder *Recorder, localAddr string, logger zerolog.Logger) *Server {
-	return &Server{
+	s := &Server{
 		recorder:  recorder,
 		localAddr: localAddr,
 		logger:    logger,
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	s.upgrader = websocket.Upgrader{
+		// CheckOrigin validates that the WebSocket upgrade request originates
+		// from the inspector itself (same host). This prevents cross-origin
+		// WebSocket hijacking (CWE-942).
+		CheckOrigin: func(r *http.Request) bool {
+			return s.isAllowedOrigin(r)
 		},
 	}
+	return s
+}
+
+// isAllowedOrigin returns true when the request's Origin header is either
+// absent (e.g., curl / same-origin browser fetch) or matches the inspector's
+// own address. This is the gating predicate for both CORS and WebSocket
+// origin validation (CWE-942).
+func (s *Server) isAllowedOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		// No Origin header — direct browser navigation or non-browser client.
+		return true
+	}
+	if s.listener == nil {
+		// Listener not yet bound; conservatively deny cross-origin requests.
+		return false
+	}
+	// The inspector binds to a local address (e.g., "127.0.0.1:4040").
+	// Acceptable origins are http:// and https:// variants of that address.
+	inspectorAddr := s.listener.Addr().String()
+	return origin == "http://"+inspectorAddr || origin == "https://"+inspectorAddr
 }
 
 // Start binds to the given address and serves the inspector.
@@ -50,7 +76,7 @@ func (s *Server) Start(addr string) error {
 	mux.HandleFunc("/api/clear", s.handleClear)
 	mux.HandleFunc("/", s.handleDashboard)
 
-	server := &http.Server{Handler: corsMiddleware(mux)}
+	server := &http.Server{Handler: corsMiddleware(s, mux)}
 	go server.Serve(listener)
 	s.logger.Info().Str("addr", listener.Addr().String()).Msg("inspector started")
 	return nil
@@ -72,16 +98,30 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+// corsMiddleware enforces same-origin access on the inspector API.
+// It only reflects the CORS allow-origin header when the request's Origin
+// matches the inspector's own address, preventing any other website from
+// reading tunnel traffic via cross-origin requests (CWE-942).
+func corsMiddleware(srv *Server, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(204)
+		if srv.isAllowedOrigin(r) {
+			origin := r.Header.Get("Origin")
+			if origin != "" {
+				// Echo the exact origin back — no wildcard.
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Vary", "Origin")
+			}
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+		// Origin present but not the inspector's own address — reject.
+		http.Error(w, "Forbidden", http.StatusForbidden)
 	})
 }
 
