@@ -74,18 +74,35 @@ func TestPathFilter_NormalPath(t *testing.T) {
 	assert.Equal(t, http.StatusOK, resp.Status, "/api/hello must pass through")
 }
 
-// TestPathFilter_SubdirDotfile verifies that /public/.hidden is NOT blocked —
-// only root-level dotfiles (paths starting with "/.") are blocked.
+// TestPathFilter_SubdirDotfile verifies that nested dotfiles are blocked.
 func TestPathFilter_SubdirDotfile(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
+		t.Error("request should have been blocked before reaching local server")
+		w.WriteHeader(200)
 	}))
 	defer srv.Close()
 
 	resp, err := ForwardToLocal(srv.Listener.Addr().String(), makeSecReq("pf5", "/public/.hidden"))
 	require.NoError(t, err)
-	// /public/.hidden does NOT start with "/." so it should pass through.
-	assert.Equal(t, http.StatusOK, resp.Status, "/public/.hidden should pass through (not a root dotfile)")
+	assert.Equal(t, http.StatusForbidden, resp.Status, "/public/.hidden must be blocked")
+}
+
+// TestPathFilter_BlockedVariants verifies that encoded, traversal, and repeated-slash variants are blocked.
+func TestPathFilter_BlockedVariants(t *testing.T) {
+	blocked := []string{"/%2eenv", "/node_modules%2fpackage.json", "/foo/../.env", "//.env", "/%2e%2e%2f.env"}
+	for _, p := range blocked {
+		t.Run(p, func(t *testing.T) {
+			srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				t.Errorf("request should have been blocked before reaching local server: %s", r.URL.Path)
+				w.WriteHeader(200)
+			}))
+			defer srv.Close()
+
+			resp, err := ForwardToLocal(srv.Listener.Addr().String(), makeSecReq("pfv", p))
+			require.NoError(t, err)
+			assert.Equal(t, http.StatusForbidden, resp.Status, "%s must be blocked", p)
+		})
+	}
 }
 
 // TestErrorSanitization verifies that 502 error body is generic (CWE-200).

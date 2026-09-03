@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,11 +15,11 @@ import (
 
 // Server runs the traffic inspector HTTP server on localhost.
 type Server struct {
-	recorder *Recorder
+	recorder  *Recorder
 	localAddr string
-	logger   zerolog.Logger
-	listener net.Listener
-	upgrader websocket.Upgrader
+	logger    zerolog.Logger
+	listener  net.Listener
+	upgrader  websocket.Upgrader
 }
 
 // NewServer creates an inspector server.
@@ -39,24 +40,36 @@ func NewServer(recorder *Recorder, localAddr string, logger zerolog.Logger) *Ser
 	return s
 }
 
-// isAllowedOrigin returns true when the request's Origin header is either
-// absent (e.g., curl / same-origin browser fetch) or matches the inspector's
-// own address. This is the gating predicate for both CORS and WebSocket
-// origin validation (CWE-942).
+// isAllowedOrigin reports whether the request Origin may access the inspector.
+// Requests without an Origin header are allowed for non-browser clients, and
+// browser origins are limited to loopback hosts on the bound inspector port.
 func (s *Server) isAllowedOrigin(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
-		// No Origin header — direct browser navigation or non-browser client.
 		return true
 	}
 	if s.listener == nil {
-		// Listener not yet bound; conservatively deny cross-origin requests.
 		return false
 	}
-	// The inspector binds to a local address (e.g., "127.0.0.1:4040").
-	// Acceptable origins are http:// and https:// variants of that address.
-	inspectorAddr := s.listener.Addr().String()
-	return origin == "http://"+inspectorAddr || origin == "https://"+inspectorAddr
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+		return false
+	}
+	_, port, err := net.SplitHostPort(s.listener.Addr().String())
+	if err != nil {
+		return false
+	}
+	if parsed.Port() != "" {
+		return parsed.Port() == port
+	}
+	return (parsed.Scheme == "http" && port == "80") || (parsed.Scheme == "https" && port == "443")
 }
 
 // Start binds to the given address and serves the inspector.

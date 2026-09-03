@@ -34,6 +34,16 @@ func (wp *wsPassthrough) handleOpen(ctx context.Context, data []byte, sendFn fun
 		return
 	}
 
+	if pathFilterEnabled() && isSensitivePath(msg.Path) {
+		errMsg, _ := json.Marshal(map[string]interface{}{
+			"type": transport.TypeWSClose,
+			"id":   msg.ID,
+			"code": 1002,
+		})
+		sendFn(transport.Message{Data: errMsg})
+		return
+	}
+
 	// Connect to local WebSocket server
 	localURL := fmt.Sprintf("ws://%s%s", wp.localAddr(ctx), msg.Path)
 	reqHeader := http.Header{}
@@ -51,9 +61,9 @@ func (wp *wsPassthrough) handleOpen(ctx context.Context, data []byte, sendFn fun
 	if err != nil {
 		wp.logger.Warn().Err(err).Str("id", msg.ID).Msg("failed to connect local WS")
 		errMsg, _ := json.Marshal(map[string]interface{}{
-			"type":  transport.TypeWSClose,
-			"id":    msg.ID,
-			"code":  1002,
+			"type": transport.TypeWSClose,
+			"id":   msg.ID,
+			"code": 1002,
 		})
 		sendFn(transport.Message{Data: errMsg})
 		return

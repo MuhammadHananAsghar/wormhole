@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"strings"
 	"time"
 
@@ -21,22 +23,28 @@ func pathFilterEnabled() bool {
 	return os.Getenv("WORMHOLE_NO_PATH_FILTER") != "1"
 }
 
-// isSensitivePath returns true when the given path should be blocked.
-// Blocked patterns:
-//   - Any path segment starting with "." at the root (/.env, /.git, /.aws, ...)
-//   - Any path containing /node_modules/
-func isSensitivePath(path string) bool {
-	// Normalise to ensure leading slash.
-	if !strings.HasPrefix(path, "/") {
-		path = "/" + path
+// isSensitivePath reports whether rawPath should be blocked before forwarding.
+// Dot segments and node_modules are matched after URL unescaping and path
+// cleaning so encoded or traversal variants cannot bypass the filter.
+func isSensitivePath(rawPath string) bool {
+	if !strings.HasPrefix(rawPath, "/") {
+		rawPath = "/" + rawPath
 	}
-	// Block root-level dotfiles: path starts with "/.".
-	if strings.HasPrefix(path, "/.") {
+	unescaped, err := url.PathUnescape(rawPath)
+	if err != nil {
 		return true
 	}
-	// Block node_modules anywhere in the path.
-	if strings.Contains(path, "/node_modules/") || path == "/node_modules" {
-		return true
+	cleaned := path.Clean(unescaped)
+	if !strings.HasPrefix(cleaned, "/") {
+		cleaned = "/" + cleaned
+	}
+	for _, segment := range strings.Split(cleaned, "/") {
+		if segment == "" {
+			continue
+		}
+		if strings.HasPrefix(segment, ".") || segment == "node_modules" {
+			return true
+		}
 	}
 	return false
 }

@@ -206,10 +206,10 @@ Wormhole includes hardening measures to protect users who inadvertently expose s
 
 ### Sensitive path blocking (CWE-441)
 
-By default, wormhole blocks requests to dotfiles and `node_modules` before they reach your local server:
+By default, wormhole blocks requests to dot segments and `node_modules` before they reach your local server. Matching is done after URL unescaping and path cleaning, so encoded or traversal variants are blocked too.
 
-- `/.env`, `/.git`, `/.aws`, `/.ssh`, `/.docker`, and any other root-level dotfile — return **403 Forbidden**
-- `/node_modules/` anywhere in the path — return **403 Forbidden**
+- `/.env`, `/.git`, `/.aws`, `/.ssh`, `/.docker`, and any other dot segment in the path: return **403 Forbidden**
+- `/node_modules/` anywhere in the path: return **403 Forbidden**
 
 This prevents credentials and source control history from being served to the internet even if your local server would normally serve them.
 
@@ -221,7 +221,7 @@ WORMHOLE_NO_PATH_FILTER=1 wormhole http 3000
 
 ### Inspector CORS hardening (CWE-942)
 
-The traffic inspector (`localhost:4040`) no longer sets `Access-Control-Allow-Origin: *`. CORS headers are only returned when the request's `Origin` matches the inspector's own address. This prevents malicious websites visited in the same browser session from reading tunnel traffic via cross-origin requests.
+The traffic inspector (`localhost:4040`) no longer sets `Access-Control-Allow-Origin: *`. CORS headers are only returned when the request's `Origin` is a loopback origin on the inspector's bound port. This prevents malicious websites visited in the same browser session from reading tunnel traffic via cross-origin requests.
 
 The WebSocket upgrader's `CheckOrigin` is also locked down to the same policy.
 
