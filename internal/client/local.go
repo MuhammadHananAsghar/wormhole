@@ -16,6 +16,18 @@ import (
 
 const localTimeout = 30 * time.Second
 
+// localTransport disables automatic compression so the tunnel forwards the
+// exact response body bytes returned by the local server.
+var localTransport = func() *http.Transport {
+	baseTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		return &http.Transport{DisableCompression: true}
+	}
+	clone := baseTransport.Clone()
+	clone.DisableCompression = true
+	return clone
+}()
+
 // pathFilterEnabled returns true unless WORMHOLE_NO_PATH_FILTER=1 is set.
 // When filtering is enabled, requests to dotfiles and node_modules are
 // blocked with 403 before reaching the local server (CWE-441).
@@ -57,6 +69,17 @@ func blockedResponse(id string) *transport.HTTPResponseMessage {
 		Status:  http.StatusForbidden,
 		Headers: map[string]string{"Content-Type": "text/plain"},
 		Body:    base64.StdEncoding.EncodeToString([]byte("Forbidden")),
+	}
+}
+
+// isSkippedResponseHeader reports whether key describes HTTP connection
+// framing that must not be forwarded through the tunnel.
+func isSkippedResponseHeader(key string) bool {
+	switch strings.ToLower(key) {
+	case "content-length", "transfer-encoding", "connection", "keep-alive", "te", "trailer", "upgrade":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -108,7 +131,7 @@ func ForwardToLocal(localAddr string, req *transport.HTTPRequestMessage) (*trans
 	}
 
 	// Make the request to local server
-	client := &http.Client{Timeout: localTimeout}
+	client := &http.Client{Timeout: localTimeout, Transport: localTransport}
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		// --- Fix 3: Error sanitisation (CWE-200) ---
@@ -135,7 +158,13 @@ func ForwardToLocal(localAddr string, req *transport.HTTPRequestMessage) (*trans
 	// Collect response headers
 	headers := make(map[string]string)
 	for key := range resp.Header {
+		if isSkippedResponseHeader(key) {
+			continue
+		}
 		headers[key] = resp.Header.Get(key)
+	}
+	if resp.Uncompressed {
+		delete(headers, "Content-Encoding")
 	}
 
 	return &transport.HTTPResponseMessage{
