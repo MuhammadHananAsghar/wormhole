@@ -1,10 +1,13 @@
 package client
 
 import (
+	"bytes"
+	"compress/gzip"
 	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -194,4 +197,103 @@ func TestForwardToLocal_PreservesHeaders(t *testing.T) {
 	resp, err := ForwardToLocal(addr, req)
 	require.NoError(t, err)
 	assert.Equal(t, "from-local", resp.Headers["X-Response"])
+}
+
+func TestForwardToLocal_DoesNotInjectAcceptEncoding(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Empty(t, r.Header.Get("Accept-Encoding"))
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer server.Close()
+
+	req := &transport.HTTPRequestMessage{
+		Type:    transport.TypeHTTPRequest,
+		ID:      "req_accept_encoding",
+		Method:  "GET",
+		Path:    "/static/app.css",
+		Headers: map[string]string{},
+		Body:    nil,
+	}
+
+	resp, err := ForwardToLocal(server.Listener.Addr().String(), req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.Status)
+}
+
+func TestForwardToLocal_PreservesGzipResponse(t *testing.T) {
+	payload := []byte("body { color: red; }")
+	var compressed bytes.Buffer
+	writer := gzip.NewWriter(&compressed)
+	_, err := writer.Write(payload)
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.Header.Get("Accept-Encoding"), "gzip")
+		w.Header().Set("Content-Type", "text/css")
+		w.Header().Set("Content-Encoding", "gzip")
+		w.Header().Set("Content-Length", strconv.Itoa(compressed.Len()))
+		w.WriteHeader(http.StatusOK)
+		_, writeErr := w.Write(compressed.Bytes())
+		require.NoError(t, writeErr)
+	}))
+	defer server.Close()
+
+	req := &transport.HTTPRequestMessage{
+		Type:   transport.TypeHTTPRequest,
+		ID:     "req_gzip",
+		Method: "GET",
+		Path:   "/static/app.css",
+		Headers: map[string]string{
+			"Accept-Encoding": "gzip, br",
+		},
+		Body: nil,
+	}
+
+	resp, err := ForwardToLocal(server.Listener.Addr().String(), req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.Status)
+	assert.Equal(t, "gzip", resp.Headers["Content-Encoding"])
+	_, hasContentLength := resp.Headers["Content-Length"]
+	assert.False(t, hasContentLength)
+
+	body, err := base64.StdEncoding.DecodeString(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, compressed.Bytes(), body)
+}
+
+func TestForwardToLocal_PreservesBrotliResponseBytes(t *testing.T) {
+	encoded := []byte{0x1b, 0x06, 0x00, 0x01, 0x8b, 0x13, 0x00}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Contains(t, r.Header.Get("Accept-Encoding"), "br")
+		w.Header().Set("Content-Type", "text/javascript")
+		w.Header().Set("Content-Encoding", "br")
+		w.Header().Set("Content-Length", strconv.Itoa(len(encoded)))
+		w.WriteHeader(http.StatusOK)
+		_, writeErr := w.Write(encoded)
+		require.NoError(t, writeErr)
+	}))
+	defer server.Close()
+
+	req := &transport.HTTPRequestMessage{
+		Type:   transport.TypeHTTPRequest,
+		ID:     "req_br",
+		Method: "GET",
+		Path:   "/static/app.js",
+		Headers: map[string]string{
+			"Accept-Encoding": "gzip, br",
+		},
+		Body: nil,
+	}
+
+	resp, err := ForwardToLocal(server.Listener.Addr().String(), req)
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, resp.Status)
+	assert.Equal(t, "br", resp.Headers["Content-Encoding"])
+	_, hasContentLength := resp.Headers["Content-Length"]
+	assert.False(t, hasContentLength)
+
+	body, err := base64.StdEncoding.DecodeString(resp.Body)
+	require.NoError(t, err)
+	assert.Equal(t, encoded, body)
 }
