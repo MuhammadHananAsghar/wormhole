@@ -200,6 +200,35 @@ wormhole/
 └── .goreleaser.yml
 ```
 
+## Security
+
+Wormhole includes hardening measures to protect users who inadvertently expose sensitive local files or infrastructure details through the tunnel.
+
+### Sensitive path blocking (CWE-441)
+
+By default, wormhole blocks requests to dot segments and `node_modules` before they reach your local server. Matching is done after URL unescaping and path cleaning, so encoded or traversal variants are blocked too.
+
+- `/.env`, `/.git`, `/.aws`, `/.ssh`, `/.docker`, and any other dot segment in the path: return **403 Forbidden**
+- `/node_modules/` anywhere in the path: return **403 Forbidden**
+
+This prevents credentials and source control history from being served to the internet even if your local server would normally serve them.
+
+To disable (for users who genuinely need to serve these paths):
+
+```bash
+WORMHOLE_NO_PATH_FILTER=1 wormhole http 3000
+```
+
+### Inspector CORS hardening (CWE-942)
+
+The traffic inspector (`localhost:4040`) no longer sets `Access-Control-Allow-Origin: *`. CORS headers are only returned when the request's `Origin` is a loopback origin on the inspector's bound port. This prevents malicious websites visited in the same browser session from reading tunnel traffic via cross-origin requests.
+
+The WebSocket upgrader's `CheckOrigin` is also locked down to the same policy.
+
+### Error message sanitization (CWE-200)
+
+When the local server is unreachable, wormhole returns a generic message (`Tunnel connected, but the local service is not responding.`) to the remote caller instead of the raw Go error string. Internal network topology details (host names, port numbers, error codes) are logged locally only and never sent through the tunnel.
+
 ## Development
 
 ```bash

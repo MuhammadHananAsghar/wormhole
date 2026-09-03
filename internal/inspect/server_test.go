@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -166,4 +167,84 @@ func TestServer_Dashboard(t *testing.T) {
 
 	assert.Equal(t, 200, resp.StatusCode)
 	assert.Contains(t, resp.Header.Get("Content-Type"), "text/html")
+}
+
+func TestServer_CORSAllowsSameOrigin(t *testing.T) {
+	rec := NewRecorder(100)
+	srv := NewServer(rec, "localhost:3000", testLogger())
+	require.NoError(t, srv.Start("127.0.0.1:0"))
+	defer srv.Close()
+
+	origin := "http://" + srv.Addr()
+	req, err := http.NewRequest(http.MethodGet, origin+"/api/requests", nil)
+	require.NoError(t, err)
+	req.Header.Set("Origin", origin)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, origin, resp.Header.Get("Access-Control-Allow-Origin"))
+	assert.NotEqual(t, "*", resp.Header.Get("Access-Control-Allow-Origin"))
+}
+
+func TestServer_CORSAllowsLocalhostOrigin(t *testing.T) {
+	rec := NewRecorder(100)
+	srv := NewServer(rec, "localhost:3000", testLogger())
+	require.NoError(t, srv.Start("localhost:0"))
+	defer srv.Close()
+
+	_, port, err := net.SplitHostPort(srv.Addr())
+	require.NoError(t, err)
+	origin := "http://localhost:" + port
+	req, err := http.NewRequest(http.MethodGet, "http://"+srv.Addr()+"/api/requests", nil)
+	require.NoError(t, err)
+	req.Header.Set("Origin", origin)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, origin, resp.Header.Get("Access-Control-Allow-Origin"))
+}
+
+func TestServer_CORSRejectsCrossOrigin(t *testing.T) {
+	rec := NewRecorder(100)
+	srv := NewServer(rec, "localhost:3000", testLogger())
+	require.NoError(t, srv.Start("127.0.0.1:0"))
+	defer srv.Close()
+
+	req, err := http.NewRequest(http.MethodGet, "http://"+srv.Addr()+"/api/requests", nil)
+	require.NoError(t, err)
+	req.Header.Set("Origin", "https://evil.example")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+}
+
+func TestServer_WebSocketOriginPolicy(t *testing.T) {
+	rec := NewRecorder(100)
+	srv := NewServer(rec, "localhost:3000", testLogger())
+	require.NoError(t, srv.Start("127.0.0.1:0"))
+	defer srv.Close()
+
+	allowedHeaders := http.Header{}
+	allowedHeaders.Set("Origin", "http://"+srv.Addr())
+	ws, _, err := websocket.DefaultDialer.Dial("ws://"+srv.Addr()+"/api/requests/stream", allowedHeaders)
+	require.NoError(t, err)
+	ws.Close()
+
+	deniedHeaders := http.Header{}
+	deniedHeaders.Set("Origin", "https://evil.example")
+	_, resp, err := websocket.DefaultDialer.Dial("ws://"+srv.Addr()+"/api/requests/stream", deniedHeaders)
+	require.Error(t, err)
+	if resp != nil {
+		assert.Equal(t, http.StatusForbidden, resp.StatusCode)
+		resp.Body.Close()
+	}
 }

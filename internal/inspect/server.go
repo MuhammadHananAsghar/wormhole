@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -14,23 +15,61 @@ import (
 
 // Server runs the traffic inspector HTTP server on localhost.
 type Server struct {
-	recorder *Recorder
+	recorder  *Recorder
 	localAddr string
-	logger   zerolog.Logger
-	listener net.Listener
-	upgrader websocket.Upgrader
+	logger    zerolog.Logger
+	listener  net.Listener
+	upgrader  websocket.Upgrader
 }
 
 // NewServer creates an inspector server.
 func NewServer(recorder *Recorder, localAddr string, logger zerolog.Logger) *Server {
-	return &Server{
+	s := &Server{
 		recorder:  recorder,
 		localAddr: localAddr,
 		logger:    logger,
-		upgrader: websocket.Upgrader{
-			CheckOrigin: func(r *http.Request) bool { return true },
+	}
+	s.upgrader = websocket.Upgrader{
+		// CheckOrigin validates that the WebSocket upgrade request originates
+		// from the inspector itself (same host). This prevents cross-origin
+		// WebSocket hijacking (CWE-942).
+		CheckOrigin: func(r *http.Request) bool {
+			return s.isAllowedOrigin(r)
 		},
 	}
+	return s
+}
+
+// isAllowedOrigin reports whether the request Origin may access the inspector.
+// Requests without an Origin header are allowed for non-browser clients, and
+// browser origins are limited to loopback hosts on the bound inspector port.
+func (s *Server) isAllowedOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	if s.listener == nil {
+		return false
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	if parsed.Scheme != "http" && parsed.Scheme != "https" {
+		return false
+	}
+	host := parsed.Hostname()
+	if host != "localhost" && host != "127.0.0.1" && host != "::1" {
+		return false
+	}
+	_, port, err := net.SplitHostPort(s.listener.Addr().String())
+	if err != nil {
+		return false
+	}
+	if parsed.Port() != "" {
+		return parsed.Port() == port
+	}
+	return (parsed.Scheme == "http" && port == "80") || (parsed.Scheme == "https" && port == "443")
 }
 
 // Start binds to the given address and serves the inspector.
@@ -50,7 +89,7 @@ func (s *Server) Start(addr string) error {
 	mux.HandleFunc("/api/clear", s.handleClear)
 	mux.HandleFunc("/", s.handleDashboard)
 
-	server := &http.Server{Handler: corsMiddleware(mux)}
+	server := &http.Server{Handler: corsMiddleware(s, mux)}
 	go server.Serve(listener)
 	s.logger.Info().Str("addr", listener.Addr().String()).Msg("inspector started")
 	return nil
@@ -72,16 +111,30 @@ func (s *Server) Close() error {
 	return nil
 }
 
-func corsMiddleware(next http.Handler) http.Handler {
+// corsMiddleware enforces same-origin access on the inspector API.
+// It only reflects the CORS allow-origin header when the request's Origin
+// matches the inspector's own address, preventing any other website from
+// reading tunnel traffic via cross-origin requests (CWE-942).
+func corsMiddleware(srv *Server, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(204)
+		if srv.isAllowedOrigin(r) {
+			origin := r.Header.Get("Origin")
+			if origin != "" {
+				// Echo the exact origin back — no wildcard.
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+				w.Header().Set("Vary", "Origin")
+			}
+			if r.Method == http.MethodOptions {
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+			next.ServeHTTP(w, r)
 			return
 		}
-		next.ServeHTTP(w, r)
+		// Origin present but not the inspector's own address — reject.
+		http.Error(w, "Forbidden", http.StatusForbidden)
 	})
 }
 
