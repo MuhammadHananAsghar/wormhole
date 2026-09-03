@@ -13,6 +13,7 @@ export interface Env {
 const RESERVED_SUBDOMAINS = new Set(["www", "api", "relay", "admin", "mail"]);
 const BASE_DOMAIN = "wormhole.bar";
 const REGISTER_PATH = "/_wormhole/register";
+const STATUS_PATH = "/_wormhole/status";
 const AUTH_GITHUB_PATH = "/_wormhole/auth/github";
 const AUTH_CALLBACK_PATH = "/_wormhole/auth/callback";
 
@@ -74,7 +75,7 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
     const code = url.searchParams.get("code");
     const port = url.searchParams.get("state") || ""; // state = CLI local port
     if (!code) {
-      return jsonResponse({ error: "Missing code parameter" }, 400);
+      return jsonResponse({ error: "Missing code or state parameter" }, 400);
     }
 
     // Exchange code for GitHub access token
@@ -155,8 +156,12 @@ async function handleAuth(request: Request, env: Env): Promise<Response> {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const host = request.headers.get("Host") || new URL(request.url).host;
+    const url = new URL(request.url);
 
-    // Handle auth requests
+    if (url.pathname === STATUS_PATH) {
+      return jsonResponse({ error: "Not found" }, 404);
+    }
+
     if (isAuthRequest(request, host)) {
       return handleAuth(request, env);
     }

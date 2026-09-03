@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { env } from "cloudflare:test";
-import { Tunnel } from "../src/tunnel";
 
 const DOMAIN = "wormhole.bar";
 
@@ -19,7 +18,7 @@ beforeAll(async () => {
 describe("Tunnel Durable Object", () => {
   function getStub() {
     const id = env.TUNNEL.newUniqueId();
-    return env.TUNNEL.get(id) as DurableObjectStub<Tunnel>;
+    return env.TUNNEL.get(id);
   }
 
   describe("proxy requests without connected client", () => {

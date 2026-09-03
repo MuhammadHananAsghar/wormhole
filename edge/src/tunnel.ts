@@ -369,8 +369,8 @@ export class Tunnel implements DurableObject {
           return;
         }
         await this.env.DB.prepare(
-          "DELETE FROM tunnels WHERE subdomain = ?"
-        ).bind(requested).run();
+          "DELETE FROM tunnels WHERE subdomain = ? AND client_id = ?"
+        ).bind(requested, active.client_id).run();
       }
 
       // Auto-reserve on first use (if not already reserved by this user)
@@ -467,8 +467,9 @@ export class Tunnel implements DurableObject {
       return;
     }
 
-    await this.env.DB.prepare("DELETE FROM tunnels WHERE subdomain = ?")
-      .bind(this.subdomain).run();
+    await this.env.DB.prepare(
+      "DELETE FROM tunnels WHERE subdomain = ? AND client_id = ?"
+    ).bind(this.subdomain, this.state.id.toString()).run();
     await this.state.storage.delete("subdomain");
     this.subdomain = null;
   }
