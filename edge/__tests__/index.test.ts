@@ -128,6 +128,20 @@ describe("Worker fetch handler", () => {
     expect(body.error).toContain("not found");
   });
 
+  it("returns 404 for the internal status path", async () => {
+    const request = new Request(`https://k7x9m2.${DOMAIN}/_wormhole/status`, {
+      headers: {
+        Host: `k7x9m2.${DOMAIN}`,
+        "x-wormhole-internal": "status",
+      },
+    });
+    const ctx = createExecutionContext();
+    const response = await worker.fetch(request, env, ctx);
+    await waitOnExecutionContext(ctx);
+
+    expect(response.status).toBe(404);
+  });
+
   it("redirects auth/github to GitHub OAuth", async () => {
     const request = new Request(`https://${DOMAIN}/_wormhole/auth/github?port=12345`);
     const ctx = createExecutionContext();
